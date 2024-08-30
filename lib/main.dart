@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -186,11 +187,11 @@ class _SnakeGameState extends State<SnakeGame> {
         title: const Text('Sota Snake Game'),
         actions: [
           IconButton(
-            icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
+            icon: Icon(isPaused ? CupertinoIcons.play_arrow : CupertinoIcons.pause),
             onPressed: togglePause,
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(CupertinoIcons.refresh),
             onPressed: () {
               setState(() {
                 resetGame();
