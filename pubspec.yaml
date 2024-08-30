@@ -61,7 +61,14 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
+  assets:
+# Suggested code may be subject to a license. Learn more: ~LicenseLog:670054657.
+    - assets/sounds/
+    - assets/sounds/click.wav
+    - assets/sounds/eat.wav
+    - assets/sounds/game_over.wav
+
+
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
