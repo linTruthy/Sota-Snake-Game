@@ -37,6 +37,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   shared_preferences: ^2.3.2
   audioplayers: ^6.1.0
+  easy_ads_flutter: ^2.5.0
 
 dev_dependencies:
   flutter_test:

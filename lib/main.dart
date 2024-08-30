@@ -1,11 +1,24 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:easy_ads_flutter/easy_ads_flutter.dart';
 
-void main() {
+const IAdIdManager adIdManager = TestAdIdManager();
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await EasyAds.instance.initialize(
+    isShowAppOpenOnAppStateChange: false,
+    adIdManager,
+    unityTestMode: false,
+    fbTestMode: false,
+    adMobAdRequest: const AdRequest(),
+    admobConfiguration: RequestConfiguration(
+        testDeviceIds: ["73D83286C35132200529A93C555F5FD6"]),
+    fbTestingId: 'd3b083f0-2987-4d05-a402-aba2011070f4',
+    fbiOSAdvertiserTrackingEnabled: true,
+  );
   runApp(const MyApp());
 }
 
@@ -58,6 +71,7 @@ class _SnakeGameState extends State<SnakeGame> {
     super.initState();
     loadHighScore();
     resetGame();
+    EasyAds.instance.loadAd();
   }
 
   Future<void> loadHighScore() async {
@@ -100,6 +114,7 @@ class _SnakeGameState extends State<SnakeGame> {
               saveHighScore();
             }
             playSound('game_over.wav');
+            showInterstitialAd();
           } else {
             if (snake.first == food) {
               growSnake();
@@ -153,8 +168,10 @@ class _SnakeGameState extends State<SnakeGame> {
   void changeDirection(Direction newDirection) {
     if ((currentDirection == Direction.up && newDirection != Direction.down) ||
         (currentDirection == Direction.down && newDirection != Direction.up) ||
-        (currentDirection == Direction.left && newDirection != Direction.right) ||
-        (currentDirection == Direction.right && newDirection != Direction.left)) {
+        (currentDirection == Direction.left &&
+            newDirection != Direction.right) ||
+        (currentDirection == Direction.right &&
+            newDirection != Direction.left)) {
       currentDirection = newDirection;
     }
   }
@@ -163,7 +180,9 @@ class _SnakeGameState extends State<SnakeGame> {
     score += 10 * level;
     if (score % 100 == 0) {
       level++;
-      snakeSpeed = Duration(milliseconds: max(50, initialSnakeSpeed.inMilliseconds - (level - 1) * 20));
+      snakeSpeed = Duration(
+          milliseconds:
+              max(50, initialSnakeSpeed.inMilliseconds - (level - 1) * 20));
       timer?.cancel();
       startGame();
     }
@@ -180,6 +199,15 @@ class _SnakeGameState extends State<SnakeGame> {
     await audioPlayer.play(AssetSource('sounds/$soundFile'));
   }
 
+  void showInterstitialAd() {
+    // EasyAds.instance.showInterstitialAd(
+    //   adNetwork: AdNetwork.admob,
+    //   adUnitId:
+    //       'ca-app-pub-3940256099942544/1033173712', // Replace with your AdMob Interstitial Ad Unit ID
+    // );
+    EasyAds.instance.showAd(AdUnitType.interstitial);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -187,11 +215,11 @@ class _SnakeGameState extends State<SnakeGame> {
         title: const Text('Sota Snake Game'),
         actions: [
           IconButton(
-            icon: Icon(isPaused ? CupertinoIcons.play_arrow : CupertinoIcons.pause),
+            icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
             onPressed: togglePause,
           ),
           IconButton(
-            icon: const Icon(CupertinoIcons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: () {
               setState(() {
                 resetGame();
@@ -202,13 +230,22 @@ class _SnakeGameState extends State<SnakeGame> {
       ),
       body: Column(
         children: [
+          const EasySmartBannerAd(
+            priorityAdNetworks: [
+              AdNetwork.admob,
+              AdNetwork.unity,
+              AdNetwork.facebook,
+            ],
+            adSize: AdSize.banner,
+          ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Score: $score', style: const TextStyle(fontSize: 18)),
-                Text('High Score: $highScore', style: const TextStyle(fontSize: 18)),
+                Text('High Score: $highScore',
+                    style: const TextStyle(fontSize: 18)),
                 Text('Level: $level', style: const TextStyle(fontSize: 18)),
               ],
             ),
@@ -264,11 +301,21 @@ class _SnakeGameState extends State<SnakeGame> {
               ),
             ),
           ),
+          if (!isGameOver)
+            const EasySmartBannerAd(
+            priorityAdNetworks: [
+              AdNetwork.admob,
+              AdNetwork.unity,
+              AdNetwork.facebook,
+            ],
+            adSize: AdSize.fullBanner,
+          ),
           if (isGameOver)
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
                 children: [
+
                   const Text(
                     'Game Over!',
                     style: TextStyle(fontSize: 24, color: Colors.red),
@@ -284,6 +331,7 @@ class _SnakeGameState extends State<SnakeGame> {
                 ],
               ),
             ),
+          const SizedBox(height: 50), // Space for banner ad
         ],
       ),
     );
@@ -293,6 +341,7 @@ class _SnakeGameState extends State<SnakeGame> {
   void dispose() {
     timer?.cancel();
     audioPlayer.dispose();
+    // EasyAds.instance.destroyAds()
     super.dispose();
   }
 }
