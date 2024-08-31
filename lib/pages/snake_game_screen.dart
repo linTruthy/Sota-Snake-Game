@@ -4,9 +4,13 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:easy_ads_flutter/easy_ads_flutter.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../components/username_dialog.dart';
+import '../services/play_games_service.dart';
+import '../services/username_service.dart';
 import 'leaderboard_screen.dart';
 import '../services/leaderboard_service.dart';
 
@@ -20,6 +24,7 @@ class SnakeGame extends StatefulWidget {
 enum Direction { up, down, left, right }
 
 class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
+  String? username;
   static const int rows = 20;
   static const int columns = 20;
   static const int initialSnakeLength = 5;
@@ -68,14 +73,45 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       CurvedAnimation(
           parent: _highScoreAnimationController, curve: Curves.easeInOut),
     );
+    _loadUsername();
+  }
+
+  Future<void> _loadUsername() async {
+    final savedUsername = await UsernameService.getUsername();
+    if (savedUsername == null) {
+      _promptForUsername();
+    } else {
+      setState(() {
+        username = savedUsername;
+      });
+    }
+  }
+
+  Future<void> _promptForUsername() async {
+    final newUsername = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return UsernameDialog(initialUsername: username);
+      },
+    );
+
+    if (newUsername != null && newUsername.isNotEmpty) {
+      setState(() {
+        username = newUsername;
+      });
+      await UsernameService.setUsername(newUsername);
+    }
   }
 
   void _submitScore() async {
     final leaderboardService = LeaderboardService();
     try {
-      await leaderboardService.submitScore('Player', score);
+      await leaderboardService.submitScore(username!, score);
     } catch (e) {
-      print('Error submitting score: $e');
+      if (kDebugMode) {
+        print('Error submitting score: $e');
+      }
     }
   }
 
@@ -84,6 +120,22 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     setState(() {
       highScore = prefs.getInt('highScore') ?? 0;
     });
+  }
+
+  void endGame() {
+    timer?.cancel();
+    isGameOver = true;
+    if (score > highScore) {
+      highScore = score;
+      saveHighScore();
+      showHighScoreEffect();
+    }
+    if (username != null) {
+      _submitScore();
+    }
+    PlayGamesService.submitScore(score);
+    playSound('game_over.wav');
+    showInterstitialAd();
   }
 
   Future<void> saveHighScore() async {
@@ -104,6 +156,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     level = 1;
     snakeSpeed = initialSnakeSpeed;
     startGame();
+    checkAndUnlockAchievements();
   }
 
   void startGame() {
@@ -119,7 +172,11 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
               saveHighScore();
               showHighScoreEffect();
             }
-            _submitScore();
+
+            if (username != null) {
+              _submitScore();
+            }
+            PlayGamesService.submitScore(score);
             playSound('game_over.wav');
             showInterstitialAd();
           } else {
@@ -194,7 +251,18 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       startGame();
       showLevelUpEffect();
       playSound('level_up.wav');
+      checkAndUnlockAchievements();
     }
+  }
+
+  void checkAndUnlockAchievements() {
+    if (score >= 100) {
+      PlayGamesService.unlockAchievement('Cgklv-Wvj_EHEAIQAQ');
+    }
+    if (level >= 5) {
+      PlayGamesService.unlockAchievement('YOUR_LEVEL_5_ACHIEVEMENT_ID');
+    }
+    // Add more achievements as needed
   }
 
   void togglePause() {
@@ -241,11 +309,11 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sota Snake Game'),
+        title: const Text('Sota Snake'),
         actions: [
           IconButton(
             icon: Icon(
-                isSoundMuted ? CupertinoIcons.volume_off : Icons.volume_up),
+                isSoundMuted ? CupertinoIcons.volume_off : CupertinoIcons.volume_up),
             onPressed: toggleSound,
           ),
           IconButton(
@@ -260,6 +328,14 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                 resetGame();
               });
             },
+          ),
+          const IconButton(
+            icon: Icon(Icons.leaderboard),
+            onPressed: PlayGamesService.showLeaderboard,
+          ),
+          IconButton(
+            icon: const Icon(CupertinoIcons.person),
+            onPressed: _promptForUsername,
           ),
         ],
       ),
@@ -378,6 +454,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                     style: TextStyle(fontSize: 24, color: Colors.red),
                   ),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+
                     children: [
                       ElevatedButton(
                         onPressed: () {

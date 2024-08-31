@@ -4,6 +4,7 @@ import 'package:easy_ads_flutter/easy_ads_flutter.dart';
 import 'package:sota_snake_game/pages/snake_game_screen.dart';
 
 import 'firebase_options.dart';
+import 'services/play_games_service.dart';
 
 const IAdIdManager adIdManager = TestAdIdManager();
 void main() async {
@@ -12,6 +13,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await PlayGamesService.initialize();
   await EasyAds.instance.initialize(
     isShowAppOpenOnAppStateChange: false,
     adIdManager,
