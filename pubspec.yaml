@@ -41,6 +41,8 @@ dependencies:
   firebase_core: ^2.10.0
   cloud_firestore: ^4.5.2
   games_services: ^3.0.0
+  web_socket_channel: ^3.0.1
+  flutter_bluetooth_serial: ^0.4.0
 
 dev_dependencies:
   flutter_test:

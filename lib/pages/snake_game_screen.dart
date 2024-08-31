@@ -7,6 +7,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/io.dart';
 
 import '../components/username_dialog.dart';
 import '../services/play_games_service.dart';
@@ -23,13 +26,20 @@ class SnakeGame extends StatefulWidget {
 
 enum Direction { up, down, left, right }
 
+enum MultiplayerMode { none, bluetooth, online }
+
 class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   String? username;
   static const int rows = 20;
   static const int columns = 20;
   static const int initialSnakeLength = 5;
   static const Duration initialSnakeSpeed = Duration(milliseconds: 200);
-
+//
+  MultiplayerMode _multiplayerMode = MultiplayerMode.none;
+  List<Point<int>> _opponentSnake = [];
+  BluetoothConnection? _bluetoothConnection;
+  WebSocketChannel? _webSocketChannel;
+  //
   List<Point<int>> snake = [];
   Point<int>? food;
   Direction currentDirection = Direction.right;
@@ -75,6 +85,70 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     );
     _loadUsername();
   }
+
+  //
+  void startMultiplayerGame(MultiplayerMode mode) {
+    setState(() {
+      _multiplayerMode = mode;
+      resetGame();
+    });
+
+    if (mode == MultiplayerMode.bluetooth) {
+      _initializeBluetoothConnection();
+    } else if (mode == MultiplayerMode.online) {
+      _initializeOnlineConnection();
+    }
+  }
+
+  Future<void> _initializeBluetoothConnection() async {
+    // Show a list of paired devices and let the user choose
+    List<BluetoothDevice> devices =
+        await FlutterBluetoothSerial.instance.getBondedDevices();
+    BluetoothDevice? selectedDevice = await showDialog(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Choose opponent device'),
+        children: devices
+            .map((device) => SimpleDialogOption(
+                  child: Text(device.name ?? ""),
+                  onPressed: () => Navigator.pop(context, device),
+                ))
+            .toList(),
+      ),
+    );
+
+    if (selectedDevice != null) {
+      _bluetoothConnection =
+          await BluetoothConnection.toAddress(selectedDevice.address);
+      _bluetoothConnection!.input!.listen(_handleIncomingBluetoothData);
+    }
+  }
+
+  void _initializeOnlineConnection() {
+    final wsUrl = Uri.parse('wss://your-websocket-server.com');
+    _webSocketChannel = IOWebSocketChannel.connect(wsUrl);
+    _webSocketChannel!.stream.listen(_handleIncomingWebSocketData);
+  }
+
+  void _handleIncomingBluetoothData(List<int> data) {
+    String message = String.fromCharCodes(data);
+    _updateOpponentSnake(message);
+  }
+
+  void _handleIncomingWebSocketData(dynamic data) {
+    _updateOpponentSnake(data as String);
+  }
+
+  void _updateOpponentSnake(String data) {
+    List<String> parts = data.split(',');
+    setState(() {
+      _opponentSnake = parts.map((part) {
+        List<String> coordinates = part.split(':');
+        return Point(int.parse(coordinates[0]), int.parse(coordinates[1]));
+      }).toList();
+    });
+  }
+  //
 
   Future<void> _loadUsername() async {
     final savedUsername = await UsernameService.getUsername();
@@ -212,6 +286,20 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
     snake.insert(0, newHead);
     snake.removeLast();
+    if (_multiplayerMode != MultiplayerMode.none) {
+      _sendSnakePosition();
+    }
+  }
+
+  void _sendSnakePosition() {
+    String positionData = snake.map((p) => '${p.x}:${p.y}').join(',');
+
+    if (_multiplayerMode == MultiplayerMode.bluetooth) {
+      _bluetoothConnection?.output
+          .add(Uint8List.fromList(positionData.codeUnits));
+    } else if (_multiplayerMode == MultiplayerMode.online) {
+      _webSocketChannel?.sink.add(positionData);
+    }
   }
 
   void growSnake() {
@@ -219,14 +307,16 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   bool isCollision() {
-    return snake.skip(1).contains(snake.first);
+    return snake.skip(1).contains(snake.first) ||
+        (_multiplayerMode != MultiplayerMode.none &&
+            _opponentSnake.contains(snake.first));
   }
 
   void generateFood() {
     final random = Random();
     do {
       food = Point(random.nextInt(columns), random.nextInt(rows));
-    } while (snake.contains(food));
+    } while (snake.contains(food) || _opponentSnake.contains(food));
   }
 
   void changeDirection(Direction newDirection) {
@@ -312,8 +402,9 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         title: const Text('Sota Snake'),
         actions: [
           IconButton(
-            icon: Icon(
-                isSoundMuted ? CupertinoIcons.volume_off : CupertinoIcons.volume_up),
+            icon: Icon(isSoundMuted
+                ? CupertinoIcons.volume_off
+                : CupertinoIcons.volume_up),
             onPressed: toggleSound,
           ),
           IconButton(
@@ -336,6 +427,24 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           IconButton(
             icon: const Icon(CupertinoIcons.person),
             onPressed: _promptForUsername,
+          ),
+          PopupMenuButton<MultiplayerMode>(
+            onSelected: startMultiplayerGame,
+            itemBuilder: (BuildContext context) =>
+                <PopupMenuEntry<MultiplayerMode>>[
+              const PopupMenuItem<MultiplayerMode>(
+                value: MultiplayerMode.none,
+                child: Text('Single Player'),
+              ),
+              const PopupMenuItem<MultiplayerMode>(
+                value: MultiplayerMode.bluetooth,
+                child: Text('Multiplayer (Bluetooth)'),
+              ),
+              const PopupMenuItem<MultiplayerMode>(
+                value: MultiplayerMode.online,
+                child: Text('Multiplayer (Online)'),
+              ),
+            ],
           ),
         ],
       ),
@@ -411,10 +520,11 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                   itemBuilder: (BuildContext context, int index) {
                     final x = index % columns;
                     final y = index ~/ columns;
-
                     final point = Point(x, y);
+
                     final isSnakeHead = point == snake.first;
                     final isSnakeBody = snake.contains(point);
+                    final isOpponentSnake = _opponentSnake.contains(point);
                     final isFood = point == food;
 
                     return Container(
@@ -424,9 +534,11 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                             ? Colors.green[700]
                             : isSnakeBody
                                 ? Colors.green
-                                : isFood
-                                    ? Colors.red
-                                    : Colors.grey[800],
+                                : isOpponentSnake
+                                    ? Colors.grey.withOpacity(0.5)
+                                    : isFood
+                                        ? Colors.red
+                                        : Colors.grey[800],
                         borderRadius: BorderRadius.circular(4),
                       ),
                     );
@@ -455,7 +567,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-
                     children: [
                       ElevatedButton(
                         onPressed: () {
@@ -494,6 +605,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     // EasyAds.instance.destroyAds()
     _levelUpAnimationController.dispose();
     _highScoreAnimationController.dispose();
+    _bluetoothConnection?.close();
+    _webSocketChannel?.sink.close();
     super.dispose();
   }
 }
