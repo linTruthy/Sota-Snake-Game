@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "669133426887",
+    "project_id": "sota-snake-game",
+    "storage_bucket": "sota-snake-game.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:669133426887:android:f4394fc0587b27e8c62ee2",
+        "android_client_info": {
+          "package_name": "com.truthysystems.sota"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAWJtH9C33OpWAUEQcwM7oXEwSH2AS2MY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

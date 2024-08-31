@@ -38,6 +38,8 @@ dependencies:
   shared_preferences: ^2.3.2
   audioplayers: ^6.1.0
   easy_ads_flutter: ^2.5.0
+  firebase_core: ^2.10.0
+  cloud_firestore: ^4.5.2
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +70,8 @@ flutter:
     - assets/sounds/click.wav
     - assets/sounds/eat.wav
     - assets/sounds/game_over.wav
+    - assets/sounds/level_up.wav
+    
 
 
   #   - images/a_dot_burr.jpeg
