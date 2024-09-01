@@ -16,6 +16,4 @@ subprojects {
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
-dependencies{
-    implementation "com.google.android.gms:play-services-games-v2:+"
-}
+

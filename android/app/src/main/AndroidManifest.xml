@@ -33,6 +33,10 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-8267064683737776~8869524204"/>
+        <meta-data
+            android:name="com.google.android.gms.games.APP_ID"
+             android:value="270883615423"/>
+            <!-- android:value="@string/game_services_project_id"/> -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

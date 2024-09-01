@@ -14,8 +14,8 @@ class PlayGamesService {
 
   static Future<void> submitScore(int score) async {
     Score scoreData = Score(
-      androidLeaderboardID: 'Cgklv_Wvj_EHEAIQAg',
-      iOSLeaderboardID: 'Cgklv_Wvj_EHEAIQAg',
+      androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
+      iOSLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
       value: score,
     );
 
@@ -35,8 +35,8 @@ class PlayGamesService {
     try {
       await GamesServices.showLeaderboards(
 // Suggested code may be subject to a license. Learn more: ~LicenseLog:2157467268.
-        iOSLeaderboardID: 'Cgklv_Wvj_EHEAIQAg',
-        androidLeaderboardID: 'Cgklv_Wvj_EHEAIQAg',
+     //   iOSLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
+      //  androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
       );
     } catch (e) {
       if (kDebugMode) {
@@ -49,6 +49,8 @@ class PlayGamesService {
     Achievement achievement = Achievement(
       androidID: achievementId,
       iOSID: achievementId,
+      steps: 100,
+      showsCompletionBanner: true,
     );
 
     try {

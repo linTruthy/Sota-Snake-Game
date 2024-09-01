@@ -73,6 +73,7 @@ android {
             signingConfig = signingConfigs.release
         }
     }
+   
 }
 
 flutter {
@@ -80,3 +81,8 @@ flutter {
 }
 
 apply plugin: 'com.google.gms.google-services'
+
+dependencies {
+    implementation "com.google.android.gms:play-services-games-v2:20.1.2"   
+}
+

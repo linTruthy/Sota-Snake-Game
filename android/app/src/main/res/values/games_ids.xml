@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--Google Play game services IDs. Save this file as res/values/games-ids.xml in your project.-->
+<resources>
+  <!--app_id-->
+  <string name="app_id" translatable="false">270883615423</string>
+  <!--package_name-->
+  <string name="package_name" translatable="false">com.truthysystems.sota</string>
+  <!--achievement Snaker-->
+  <string name="achievement_snaker" translatable="false">CgkIv-Wvj_EHEAIQAQ</string>
+  <!--event Event1-->
+  <string name="event_event1" translatable="false">CgkIv-Wvj_EHEAIQAw</string>
+  <!--leaderboard Snaker Master-->
+  <string name="leaderboard_snaker_master" translatable="false">CgkIv-Wvj_EHEAIQAg</string>
+</resources>
