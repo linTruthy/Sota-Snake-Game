@@ -61,4 +61,14 @@ class PlayGamesService {
       }
     }
   }
+
+  static showAchievements() {
+    try {
+      GamesServices.showAchievements();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error showing achievements: $e');
+      }
+    }
+  }
 }
