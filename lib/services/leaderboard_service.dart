@@ -28,7 +28,7 @@ class LeaderboardService {
   // Stream for the weekly leaderboard
   Stream<List<LeaderboardEntry>> getWeeklyLeaderboardStream() {
     DateTime now = DateTime.now();
-    DateTime startOfWeek = now.subtract(Duration(days:  7));
+    DateTime startOfWeek = now.subtract(const Duration(days: 7));
 
     return _firestore
         .collection('leaderboard')
@@ -62,7 +62,7 @@ class LeaderboardService {
 
   getWeeklyLeaderboard() {
     DateTime now = DateTime.now();
-    DateTime startOfWeek = now.subtract(Duration(days: 7));
+    DateTime startOfWeek = now.subtract(const Duration(days: 7));
     List<LeaderboardEntry> weeklyLeaderboard = [];
 
     _firestore
