@@ -7,13 +7,19 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../components/username_dialog.dart';
+import '../components/gameover_dialog.dart';
+import '../game_score_display.dart';
 import '../models/power_up.dart';
 import '../services/play_games_service.dart';
 import '../services/username_service.dart';
 import 'leaderboard_screen.dart';
 import '../services/leaderboard_service.dart';
 import 'package:in_app_update/in_app_update.dart';
+
+import 'powerup_indicator.dart';
+import 'settings_dialog.dart';
+import 'snake_game_board.dart';
+import 'username_dialog.dart';
 
 class SnakeGame extends StatefulWidget {
   const SnakeGame({super.key});
@@ -140,43 +146,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         endPowerUp(powerUp);
       }
     });
-    // Revert the effects after the duration
-    // Timer(powerUp.duration, () {
-    //   switch (powerUp.type) {
-    //     case 'speedBoost':
-    //       snakeSpeed = initialSnakeSpeed;
-    //       break;
-
-    //     case 'slowMotion':
-    //       snakeSpeed = initialSnakeSpeed;
-    //       break;
-    //     case 'scoreMultiplier':
-    //       scoreMultiplier = 1;
-    //       break;
-    //     case 'invincibility':
-    //       isInvincible = false;
-    //       break;
-    //   }
-    //   //cancel all other snackbars
-    //   ScaffoldMessenger.of(context).clearSnackBars();
-    //   //snackbar to show end of power up
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     SnackBar(
-    //       behavior: SnackBarBehavior.floating,
-    //       shape: RoundedRectangleBorder(
-    //         borderRadius: BorderRadius.circular(10),
-    //       ),
-    //       backgroundColor: Colors.black,
-    //       content: Center(
-    //         child: Text('${powerUp.type} power up ended!',
-    //             style: const TextStyle(color: Colors.yellow, fontSize: 16)),
-    //       ),
-    //       duration: const Duration(seconds: 2),
-    //     ),
-    //   );
-    //   powerUps.remove(powerUp);
-    //   isPowerUp = false;
-    // });
   }
 
   void showPowerUpEffect(PowerUp powerUp) {
@@ -212,10 +181,10 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   bool isSoundMuted = false;
 
   late AnimationController _levelUpAnimationController;
-  late Animation<double> _levelUpAnimation;
+  // late Animation<double> _levelUpAnimation;
 
   late AnimationController _highScoreAnimationController;
-  late Animation<double> _highScoreAnimation;
+  //late Animation<double> _highScoreAnimation;
 
   late AnimationController _powerUpAnimationController;
   late Animation<double> _powerUpAnimation;
@@ -237,19 +206,19 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    _levelUpAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
-      CurvedAnimation(
-          parent: _levelUpAnimationController, curve: Curves.easeInOut),
-    );
+    // _levelUpAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
+    //   CurvedAnimation(
+    //       parent: _levelUpAnimationController, curve: Curves.easeInOut),
+    // );
 
     _highScoreAnimationController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    _highScoreAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
-      CurvedAnimation(
-          parent: _highScoreAnimationController, curve: Curves.easeInOut),
-    );
+    // _highScoreAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
+    //   CurvedAnimation(
+    //       parent: _highScoreAnimationController, curve: Curves.easeInOut),
+    // );
     _powerUpAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
@@ -294,19 +263,19 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   Future<void> _promptForUsername() async {
-    final newUsername = await showDialog<String>(
+    String? username = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return UsernameDialog(initialUsername: username);
+        return const Username3DDialog();
       },
     );
 
-    if (newUsername != null && newUsername.isNotEmpty) {
+    if (username != null && username.isNotEmpty) {
       setState(() {
-        username = newUsername;
+        username = username;
       });
-      await UsernameService.setUsername(newUsername);
+      await UsernameService.setUsername(username!);
     }
   }
 
@@ -569,168 +538,351 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         .then((_) => _highScoreAnimationController.reverse());
   }
 
+// Helper method to build menu items
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.grey[850]!.withOpacity(0.5),
+                  Colors.grey[900]!.withOpacity(0.5),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.grey[800]!.withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: Colors.green[400], size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: Colors.grey[600],
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: Drawer(
-          elevation: 20,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                transform: const GradientRotation(45 * pi / 180),
-                colors: [
-                  const Scaffold().backgroundColor ?? Colors.black,
-                  const Scaffold().backgroundColor ?? Colors.black,
-                  const Scaffold().backgroundColor ?? Colors.black,
-                  const Scaffold().backgroundColor ?? Colors.black,
-                  const Scaffold().backgroundColor ?? Colors.black,
-                  const Scaffold().backgroundColor ?? Colors.black,
-                  const Scaffold().backgroundColor ?? Colors.black,
-                  const Scaffold().backgroundColor ?? Colors.black,
-                  Colors.green[900] ?? Colors.black,
-                  Colors.green[700] ?? Colors.black,
-                  Colors.green[400] ?? Colors.black,
-                  Colors.green[200] ?? Colors.black,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.grey[900]!,
+                Colors.grey[850]!,
+                Colors.grey[900]!,
+              ],
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      DrawerHeader(
-                        decoration: BoxDecoration(
-                          color:
-                              const Scaffold().backgroundColor ?? Colors.black,
-                        ),
-                        child: const Text(
-                          'Sota Snake Game',
-                          style: TextStyle(color: Colors.white, fontSize: 24),
-                        ),
-                      ),
-                      ListTile(
-                        leading: const Icon(CupertinoIcons.volume_up),
-                        title: const Text('Settings'),
-                        subtitle: Text(
-                            isSoundMuted ? 'Sound: Off' : 'Sound: On',
-                            style: TextStyle(
-                                color: isSoundMuted ? Colors.red : Colors.green,
-                                fontSize: 16)),
-                        onTap: () {
-                          _showSettingsDialog(context);
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.leaderboard_rounded),
-                        title: const Text('Leaderboard'),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                LeaderboardScreen(username: username),
-                          ),
-                        ),
-                      ),
-                      ListTile(
-                        leading: const Icon(CupertinoIcons.person),
-                        subtitle: Text(username ?? 'Guest'),
-                        title: const Text('Profile'),
-                        onTap: _promptForUsername,
-                      ),
-                      // ListTile(
-                      //   leading: const Icon(CupertinoIcons.heart),
-                      //   title: const Text('Achievements'),
-                      //   onTap: () => PlayGamesService.showAchievements(),
-                      // ),
+          ),
+          child: Column(
+            children: [
+              // Profile Header
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.green[900]!,
+                      Colors.grey[900]!,
                     ],
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text(
-                    'Developed by Truthy Systems',
-                    style: TextStyle(
-                      color: Colors.black45,
-                      fontSize: 16,
-                      fontStyle: FontStyle.italic,
+                child: Stack(
+                  children: [
+                    // Animated Pattern Overlay
+                    ...List.generate(
+                      5,
+                      (index) => AnimatedPositioned(
+                        duration: const Duration(seconds: 2),
+                        curve: Curves.easeInOut,
+                        child: Transform.rotate(
+                          angle: pi / 4,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.white.withOpacity(0.05),
+                                  Colors.white.withOpacity(0.1),
+                                ],
+                                stops: const [0.4, 0.6],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Profile Content
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.green[400]!,
+                                  Colors.green[600]!,
+                                ],
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.person,
+                                size: 40, color: Colors.white),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            username ?? 'Guest',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green[900]!.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'Player Profile',
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Menu Items
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _buildMenuItem(
+                      icon: CupertinoIcons.settings,
+                      title: 'Settings',
+                      subtitle: isSoundMuted ? 'Sound: Off' : 'Sound: On',
+                      onTap: () => _showSettingsDialog(context),
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.leaderboard_rounded,
+                      title: 'Leaderboard',
+                      subtitle: 'View top players',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              LeaderboardScreen(username: username),
+                        ),
+                      ),
+                    ),
+                    _buildMenuItem(
+                      icon: CupertinoIcons.person,
+                      title: 'Profile',
+                      subtitle: username ?? 'Guest',
+                      onTap: _promptForUsername,
+                    ),
+                    _buildMenuItem(
+                      icon: CupertinoIcons.heart,
+                      title: 'Achievements',
+                      subtitle: 'View your progress',
+                      onTap: () => PlayGamesService.showAchievements(),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Footer
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.grey[800]!,
+                      width: 1,
                     ),
                   ),
                 ),
-              ],
-            ),
-          )),
-      appBar: AppBar(
-        title: const Text(
-          'Sota Snake',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.games, size: 16, color: Colors.grey[400]),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Sota Snake v1.0.8',
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Truthy Systems',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              transform: const GradientRotation(45 * pi / 180),
-              colors: [
-                const Scaffold().backgroundColor ?? Colors.black,
-                const Scaffold().backgroundColor ?? Colors.black,
-                const Scaffold().backgroundColor ?? Colors.black,
-                const Scaffold().backgroundColor ?? Colors.black,
-                const Scaffold().backgroundColor ?? Colors.black,
-                Colors.green[800] ?? Colors.black,
-                Colors.green[700] ?? Colors.black,
-                Colors.green[400] ?? Colors.black,
-                Colors.green[200] ?? Colors.black,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      ),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(48), // Reduced height
+        child: AppBar(
+          automaticallyImplyLeading: false, // Disable default drawer button
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black,
+                  Colors.black87,
+                  Colors.green.shade900,
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  // Menu Button wrapped in Builder
+                  Builder(
+                    builder: (BuildContext context) => IconButton(
+                      icon: Icon(Icons.menu, color: Colors.green.shade400),
+                      onPressed: () => Scaffold.of(context).openDrawer(),
+                    ),
+                  ),
+
+                  // Title and Username
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sota Snake',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          foreground: Paint()
+                            ..shader = LinearGradient(
+                              colors: [
+                                Colors.green.shade400,
+                                Colors.green.shade200,
+                              ],
+                            ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
+                        ),
+                      ),
+                      Text(
+                        'Welcome, ${username ?? 'Guest'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green.shade400.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const Spacer(),
+
+                  // Sound Toggle Button
+                  IconButton(
+                    icon: Icon(
+                      isSoundMuted
+                          ? CupertinoIcons.volume_off
+                          : CupertinoIcons.volume_up,
+                      color: isSoundMuted
+                          ? Colors.red.shade400
+                          : Colors.green.shade400,
+                    ),
+                    onPressed: toggleSound,
+                  ),
+                ],
+              ),
             ),
           ),
+          elevation: 0, // Remove default shadow
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              isSoundMuted
-                  ? CupertinoIcons.volume_off
-                  : CupertinoIcons.volume_up,
-              color: Colors.white,
-            ),
-            onPressed: toggleSound,
-          ),
-          // IconButton(
-          //   icon: Icon(
-          //     isPaused ? CupertinoIcons.play_arrow : CupertinoIcons.pause,
-          //     color: Colors.white,
-          //   ),
-          //   onPressed: togglePause,
-          // ),
-          // IconButton(
-          //   icon: const Icon(CupertinoIcons.refresh, color: Colors.white),
-          //   onPressed: () {
-          //     setState(() {
-          //       resetGame();
-          //     });
-          //   },
-          // ),
-          // IconButton(
-          //   icon: const Icon(Icons.leaderboard_rounded, color: Colors.white),
-          //   onPressed: () => Navigator.push(
-          //     context,
-          //     MaterialPageRoute(
-          //         builder: (context) => LeaderboardScreen(username: username)),
-          //   ),
-          // ),
-          // IconButton(
-          //   icon: const Icon(CupertinoIcons.person, color: Colors.white),
-          //   onPressed: _promptForUsername,
-          // ),
-        ],
       ),
       floatingActionButtonLocation:
           FloatingActionButtonLocation.miniCenterDocked,
@@ -747,168 +899,43 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       body: Stack(children: [
         Column(
           children: [
-            const EasySmartBannerAd(
-              priorityAdNetworks: [
-                AdNetwork.admob,
-                AdNetwork.unity,
-                AdNetwork.facebook,
-              ],
-              adSize: AdSize.banner,
-            ),
+            // const EasySmartBannerAd(
+            //   priorityAdNetworks: [
+            //     AdNetwork.admob,
+            //     AdNetwork.unity,
+            //     AdNetwork.facebook,
+            //   ],
+            //   adSize: AdSize.banner,
+            // ),
             if (isPowerUp)
               Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_getPowerUpString(powerUpString),
-                            style: const TextStyle(fontSize: 16)),
-                        const SizedBox(
-                          width: 3,
-                        ),
-                        Expanded(
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              LinearProgressIndicator(
-                                value: _progress,
-                                backgroundColor: Colors.grey[500],
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    _getProgressColor()),
-                              ),
-                              CircleAvatar(
-                                backgroundColor: _getProgressColor(),
-                                radius: 15,
-                                child: Text('${_remainingTime}s',
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white60,
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                child: PowerUpIndicator(
+                  remainingTime: _remainingTime,
+                  duration: const Duration(seconds: 30),
+                  powerUpType: powerUpString ?? 'default',
+                  progress: _progress,
                 ),
               ),
             const SizedBox(height: 3),
             Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Score with fun icon and gradient text
-                  Flexible(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 20),
-                        const SizedBox(width: 5),
-                        Flexible(
-                          child: Text(
-                            'Score: $score',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              overflow:
-                                  TextOverflow.ellipsis, // Prevent overflow
-                              foreground: Paint()
-                                ..shader = const LinearGradient(
-                                  colors: <Color>[
-                                    Colors.orangeAccent,
-                                    Colors.redAccent,
-                                  ],
-                                ).createShader(
-                                  const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0),
-                                ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // High Score with animated scaling effect
-                  Flexible(
-                    child: AnimatedBuilder(
-                      animation: _highScoreAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _highScoreAnimation.value,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.emoji_events,
-                                  color: Colors.yellow, size: 20),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  '$highScore',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    overflow: TextOverflow
-                                        .ellipsis, // Prevent overflow
-                                    color: Colors.yellow,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Level Up with animated scaling and gradient text
-                  Flexible(
-                    child: AnimatedBuilder(
-                      animation: _levelUpAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _levelUpAnimation.value,
-                          child: Row(
-                            children: [
-                              const Icon(Icons.arrow_upward,
-                                  color: Colors.green, size: 20),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  'Level: $level',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    overflow: TextOverflow
-                                        .ellipsis, // Prevent overflow
-                                    foreground: Paint()
-                                      ..shader = const LinearGradient(
-                                        colors: <Color>[
-                                          Colors.lightGreenAccent,
-                                          Colors.green,
-                                        ],
-                                      ).createShader(
-                                        const Rect.fromLTWH(
-                                            0.0, 0.0, 200.0, 70.0),
-                                      ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: GameScoreDisplay(
+                score: score,
+                highScore: highScore,
+                level: level,
               ),
             ),
             Expanded(
-              child: AspectRatio(
-                aspectRatio: columns / rows,
-                child: GestureDetector(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SnakeGameBoard(
+                  rows: rows,
+                  columns: columns,
+                  snake: snake,
+                  food: food,
+                  powerUps: powerUps,
+                  snakeSpeed: snakeSpeed,
                   onVerticalDragUpdate: (details) {
                     if (details.delta.dy < 0) {
                       changeDirection(Direction.up);
@@ -923,68 +950,21 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                       changeDirection(Direction.right);
                     }
                   },
-                  child: LayoutBuilder(builder: (context, constraints) {
-                    double gridSize =
-                        min(constraints.maxWidth, constraints.maxHeight);
-                    return SizedBox(
-                      width: gridSize,
-                      height: gridSize,
-                      child: GridView.builder(
-                        itemCount: rows * columns,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                        ),
-                        itemBuilder: (BuildContext context, int index) {
-                          final x = index % columns;
-                          final y = index ~/ columns;
-                          final point = Point(x, y);
-                          final isSnakeHead = point == snake.first;
-                          final isSnakeBody = snake.contains(point);
-                          final isFood = point == food;
-                          return AnimatedContainer(
-                              duration: snakeSpeed,
-                              margin: const EdgeInsets.all(1),
-                              decoration: BoxDecoration(
-                                color: powerUps.any((p) => p.position == point)
-                                    ? Colors.blueAccent.withOpacity(0.8)
-                                    : isSnakeHead
-                                        ? Colors.green[700]
-                                        : isSnakeBody
-                                            ? Colors.green[400]
-                                            : isFood
-                                                ? Colors.red
-                                                : Colors.grey[800],
-                                borderRadius: BorderRadius.circular(4),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    spreadRadius: 1,
-                                    blurRadius: 3,
-                                    offset: const Offset(0, 3), // Shadow effect
-                                  ),
-                                ],
-                              ));
-                        },
-                      ),
-                    );
-                  }),
                 ),
               ),
             ),
             const SizedBox(
               height: 3,
             ),
-            if (!isGameOver || isPaused)
-              const EasySmartBannerAd(
-                priorityAdNetworks: [
-                  AdNetwork.admob,
-                  AdNetwork.unity,
-                  AdNetwork.facebook,
-                ],
-                adSize: AdSize.largeBanner,
-              ),
+            // if (!isGameOver || isPaused)
+            //   const EasySmartBannerAd(
+            //     priorityAdNetworks: [
+            //       AdNetwork.admob,
+            //       AdNetwork.unity,
+            //       AdNetwork.facebook,
+            //     ],
+            //     adSize: AdSize.largeBanner,
+            //   ),
             if (isGameOver)
               Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -1039,31 +1019,100 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
             ),
           ),
       ]),
-      bottomNavigationBar: BottomAppBar(
-        height: 52,
-        color: Colors.green[800],
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 5.0,
-        child: Row(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.leaderboard_rounded, color: Colors.white),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        LeaderboardScreen(username: username)),
+      bottomNavigationBar: Container(
+        height: 50,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.green[900]!,
+              Colors.green[800]!,
+              Colors.green[700]!,
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // 3D depth effect
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.2),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
-            IconButton(
-              icon: const Icon(CupertinoIcons.refresh, color: Colors.white),
-              onPressed: () {
-                setState(() {
-                  resetGame();
-                });
-              },
+
+            // Main content
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // Leaderboard button
+                _buildAnimatedButton(
+                  icon: Icons.leaderboard_rounded,
+                  color: Colors.amber,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          LeaderboardScreen(username: username),
+                    ),
+                  ),
+                ),
+
+                // Spacer for FAB
+                const SizedBox(width: 80),
+
+                // Reset button
+                _buildAnimatedButton(
+                  icon: CupertinoIcons.refresh,
+                  color: Colors.blue,
+                  onTap: () {
+                    setState(() {
+                      resetGame();
+                    });
+                  },
+                ),
+              ],
+            ),
+
+            // Floating Action Button
+            Positioned(
+              top: -30,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _buildFloatingActionButton(),
+              ),
+            ),
+
+            // Top shine effect
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      Colors.white.withOpacity(0.3),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -1083,49 +1132,115 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  showGameOverDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.deepPurple[300],
-          title:
-              const Text('Game Over!', style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('You scored $score points!'),
-              const EasySmartBannerAd(
-                adSize: AdSize.banner,
-                priorityAdNetworks: [
-                  AdNetwork.admob,
-                  AdNetwork.unity,
-                  AdNetwork.facebook,
+  Widget _buildAnimatedButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1.0, end: 1.0),
+      duration: const Duration(milliseconds: 200),
+      builder: (context, scale, child) {
+        return GestureDetector(
+          onTapDown: (_) => setState(() {}),
+          onTapUp: (_) => setState(() {}),
+          onTap: onTap,
+          child: Transform.scale(
+            scale: scale,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    color.withOpacity(0.8),
+                    color,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
-            ],
+              child: Icon(icon, color: Colors.white, size: 28),
+            ),
           ),
-          actions: [
-            ElevatedButton(
-              child: const Text('Leaderboard'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        LeaderboardScreen(username: username)),
+        );
+      },
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1.0, end: 1.0),
+      duration: const Duration(milliseconds: 200),
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: GestureDetector(
+            onTapDown: (_) => setState(() {}),
+            onTapUp: (_) => setState(() {}),
+            onTap: togglePause,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    isPaused ? Colors.red[600]! : Colors.green[600]!,
+                    isPaused ? Colors.red[400]! : Colors.green[400]!,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        (isPaused ? Colors.red : Colors.green).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Icon(
+                isPaused ? CupertinoIcons.play_fill : CupertinoIcons.pause_fill,
+                color: Colors.white,
+                size: 32,
               ),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              onPressed: () {
-                setState(() {
-                  resetGame();
-                });
-                Navigator.of(context).pop();
-              },
-              child: const Text('Play Again'),
-            ),
-          ],
+          ),
+        );
+      },
+    );
+  }
+
+  void showGameOverDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return GameOverDialog(
+          score: score,
+          highScore: highScore,
+          onPlayAgain: () {
+            Navigator.of(context).pop();
+            setState(() {
+              resetGame();
+            });
+          },
+          onShowLeaderboard: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LeaderboardScreen(username: username),
+              ),
+            );
+          },
         );
       },
     );
@@ -1135,51 +1250,19 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Settings'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Text('Volume'),
-                  Expanded(
-                    child: Slider(
-                      value: volume,
-                      onChanged: (newVolume) {
-                        setState(() {
-                          volume = newVolume;
-                        });
-                      },
-                      min: 0.0,
-                      max: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Text('Background Music'),
-                  CupertinoSwitch(
-                    value: isMusicEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        isMusicEnabled = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Close'),
-            ),
-          ],
+        return EnhancedSettingsDialog(
+          initialVolume: volume,
+          initialMusicEnabled: isMusicEnabled,
+          onVolumeChanged: (newVolume) {
+            setState(() {
+              volume = newVolume;
+            });
+          },
+          onMusicToggled: (enabled) {
+            setState(() {
+              isMusicEnabled = enabled;
+            });
+          },
         );
       },
     );

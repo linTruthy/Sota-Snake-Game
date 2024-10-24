@@ -48,13 +48,13 @@ android {
     }
     signingConfigs {
        debug {
-            storeFile file('/home/user/myapp/costmasterapp_flutter.jks')
+            storeFile file('/home/user/Sota-Snake-Game/costmasterapp_flutter.jks')
             storePassword 'Conliet256'
             keyAlias 'truthy'
             keyPassword 'Conliet256'
         }
         release {
-            storeFile file('/home/user/myapp/costmasterapp_flutter.jks')
+            storeFile file('/home/user/Sota-Snake-Game/costmasterapp_flutter.jks')
             storePassword 'Conliet256'
             keyAlias 'truthy'
             keyPassword 'Conliet256'
