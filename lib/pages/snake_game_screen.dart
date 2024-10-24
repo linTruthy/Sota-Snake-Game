@@ -12,6 +12,8 @@ import '../game_score_display.dart';
 import '../models/power_up.dart';
 import '../services/play_games_service.dart';
 import '../services/username_service.dart';
+import 'achievements_screen.dart';
+import 'daily_task_screen.dart';
 import 'leaderboard_screen.dart';
 import '../services/leaderboard_service.dart';
 import 'package:in_app_update/in_app_update.dart';
@@ -734,6 +736,20 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                   padding: const EdgeInsets.all(16),
                   children: [
                     _buildMenuItem(
+                      icon: CupertinoIcons.doc_checkmark,
+                      title: 'Daily Tasks',
+                      subtitle: 'New',
+                      onTap: () {
+                        Navigator.pop(context); // Close drawer
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const DailyTasksScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildMenuItem(
                       icon: CupertinoIcons.settings,
                       title: 'Settings',
                       subtitle: isSoundMuted ? 'Sound: Off' : 'Sound: On',
@@ -761,7 +777,20 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                       icon: CupertinoIcons.heart,
                       title: 'Achievements',
                       subtitle: 'View your progress',
-                      onTap: () => PlayGamesService.showAchievements(),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const EnhancedAchievementsScreen()),
+                        );
+                      },
+                    ),
+                    _buildMenuItem(
+                      icon: CupertinoIcons.info_circle,
+                      title: 'How to Play',
+                      subtitle: 'View your progress',
+                      onTap: () => _showHowToPlayDialog(context),
                     ),
                   ],
                 ),
@@ -786,7 +815,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                         Icon(Icons.games, size: 16, color: Colors.grey[400]),
                         const SizedBox(width: 8),
                         Text(
-                          'Sota Snake v1.0.8',
+                          'Sota Snake v1.1.1',
                           style: TextStyle(
                             color: Colors.grey[400],
                             fontSize: 12,
@@ -1216,6 +1245,130 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           ),
         );
       },
+    );
+  }
+
+  void _showHowToPlayDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'How to Play',
+            style: TextStyle(color: Colors.green),
+            textAlign: TextAlign.center,
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildInstructionCard(
+                  icon: Icons.swipe,
+                  title: 'Controls',
+                  description: 'Swipe in any direction to move the snake.',
+                ),
+                const SizedBox(height: 16),
+                _buildInstructionCard(
+                  icon: Icons.restaurant,
+                  title: 'Eat Food',
+                  description:
+                      'Collect red food dots to grow longer and score points.',
+                ),
+                const SizedBox(height: 16),
+                _buildInstructionCard(
+                  icon: Icons.flash_on,
+                  title: 'Power-ups',
+                  description: 'Collect blue power-ups for special abilities.',
+                ),
+                const SizedBox(height: 16),
+                _buildInstructionCard(
+                  icon: Icons.warning,
+                  title: 'Avoid Collisions',
+                  description:
+                      'Don\'t hit the snake\'s body or it\'s game over!',
+                ),
+                const SizedBox(height: 16),
+                _buildInstructionCard(
+                  icon: Icons.task_alt,
+                  title: 'Daily Tasks',
+                  description:
+                      'Complete daily challenges to earn bonus points.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Got it!',
+                style: TextStyle(color: Colors.green),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInstructionCard({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[850],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.green.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.green,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  description,
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
