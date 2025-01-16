@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:confetti/confetti.dart';
 import 'package:easy_ads_flutter/easy_ads_flutter.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -37,12 +38,17 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
   bool _flexibleUpdateAvailable = false;
 //
+  int _foodEatenCount = 0;
   List<DailyTask> _activeTasks = [];
   Map<String, Timer> _powerUpTimers = {};
   List<PowerUp> _activePowerUps = [];
   Map<String, int> _remainingTimes = {};
   Map<String, Duration> _powerUpDurations = {};
   final ScoreManager _scoreManager = ScoreManager();
+  late ConfettiController _taskConfettiController;
+  bool _showTaskCompletionBanner = false;
+  String _completedTaskTitle = '';
+  Timer? _bannerTimer;
 //
   Future<void> _checkForUpdate() async {
     InAppUpdate.checkForUpdate().then((info) {
@@ -241,6 +247,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     _scoreManager.resetScore();
     _loadDailyTasks();
     EasyAds.instance.loadAd();
+    _taskConfettiController =
+        ConfettiController(duration: const Duration(seconds: 2));
     _levelUpAnimationController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
@@ -271,6 +279,33 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     _checkForUpdate();
   }
 
+  void _showTaskCompletion(DailyTask task) {
+    setState(() {
+      _showTaskCompletionBanner = true;
+      _completedTaskTitle = task.title;
+    });
+
+    _taskConfettiController.play();
+    playSound('level_up.wav'); // Reuse existing success sound
+
+    // Clear any existing banner timer
+    _bannerTimer?.cancel();
+
+    // Auto-hide banner after 3 seconds
+    _bannerTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _showTaskCompletionBanner = false;
+        });
+      }
+    });
+
+    // Check if all tasks are complete
+    if (_activeTasks.every((task) => task.isCompleted)) {
+      _showAllTasksCompleted();
+    }
+  }
+
   Future<void> _loadDailyTasks() async {
     final tasks = await DailyTaskService.getDailyTasks();
     setState(() {
@@ -287,7 +322,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       int progress = 0;
       switch (task.type) {
         case TaskType.score:
-          progress = _scoreManager.currentScore;
+          final score = _scoreManager.currentScore;
+          progress = score;
           break;
         case TaskType.timeAlive:
           // Convert game time to seconds
@@ -299,16 +335,22 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           progress = _activePowerUps.length;
           break;
         case TaskType.foodEaten:
-          // Calculate from snake length
-          progress = snake.length - initialSnakeLength;
+          // Use the dedicated food eaten counter
+          progress = _foodEatenCount;
           break;
         case TaskType.levelReached:
           progress = level;
           break;
       }
 
-      if (progress > 0) {
+      // Ensure progress doesn't exceed target
+      progress = min(progress, task.target);
+
+      if (progress > 0 && progress != task.progress) {
         DailyTaskService.updateTaskProgress(task.id, progress);
+      }
+      if (progress >= task.target && !task.isCompleted) {
+        _showTaskCompletion(task);
       }
     }
   }
@@ -398,6 +440,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   void resetGame() {
+    _foodEatenCount = 0;
     snake.clear();
     for (int i = 0; i < initialSnakeLength; i++) {
       snake.add(Point(initialSnakeLength - i, 0));
@@ -415,7 +458,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
     isGameOver = false;
     isPaused = false;
-     _scoreManager.resetScore();
+    _scoreManager.resetScore();
     level = 1;
     snakeSpeed = initialSnakeSpeed;
     startGame();
@@ -487,12 +530,14 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
             if (snake.first == food) {
               growSnake();
               generateFood();
+              _foodEatenCount++;
               if (Random().nextInt(5) == 0 && powerUps.isEmpty) {
                 powerUps.clear();
                 generatePowerUp();
               }
 
               increaseScore();
+              _updateTaskProgress();
               playSound('eat.wav');
             }
             if (powerUps.isNotEmpty) {
@@ -1118,6 +1163,90 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                 },
               ),
             ),
+          if (_showTaskCompletionBanner)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 20,
+              left: 20,
+              right: 20,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: _showTaskCompletionBanner ? 1.0 : 0.0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.green[700]!,
+                        Colors.green[600]!,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Task Completed!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              _completedTaskTitle,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Confetti overlay for task completion
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _taskConfettiController,
+              blastDirection: pi / 2,
+              maxBlastForce: 5,
+              minBlastForce: 2,
+              emissionFrequency: 0.05,
+              numberOfParticles: 20,
+              gravity: 0.1,
+              colors: const [
+                Colors.green,
+                Colors.blue,
+                Colors.pink,
+                Colors.orange,
+                Colors.purple
+              ],
+            ),
+          ),
         ]),
         bottomNavigationBar: Container(
           height: 68,
@@ -1288,7 +1417,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   void dispose() {
     timer?.cancel();
     audioPlayer.dispose();
-
+    _taskConfettiController.dispose();
+    _bannerTimer?.cancel();
     _levelUpAnimationController.dispose();
     _highScoreAnimationController.dispose();
     _powerUpTimer?.cancel();
@@ -1455,7 +1585,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return EnhancedSettingsDialog(
+        return SettingsDialog(
           initialVolume: volume,
           initialMusicEnabled: isMusicEnabled,
           onVolumeChanged: (newVolume) {
@@ -1534,6 +1664,91 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       checkAndUnlockAchievements();
     }
     return score;
+  }
+
+  void _showAllTasksCompleted() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.green[900]!,
+                  Colors.green[800]!,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.green[400]!,
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.5),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.emoji_events,
+                  color: Colors.amber,
+                  size: 50,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '🎉 All Tasks Completed! 🎉',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Congratulations! You\'ve completed all daily tasks.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Continue Playing',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // Determine the progress bar color based on the remaining time

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-class EnhancedSettingsDialog extends StatefulWidget {
+class SettingsDialog extends StatefulWidget {
   final double initialVolume;
   final bool initialMusicEnabled;
   final Function(double) onVolumeChanged;
   final Function(bool) onMusicToggled;
 
-  const EnhancedSettingsDialog({
+  const SettingsDialog({
     super.key,
     required this.initialVolume,
     required this.initialMusicEnabled,
@@ -15,10 +15,11 @@ class EnhancedSettingsDialog extends StatefulWidget {
   });
 
   @override
-  State<EnhancedSettingsDialog> createState() => _EnhancedSettingsDialogState();
+  State<SettingsDialog> createState() => _SettingsDialogState();
 }
 
-class _EnhancedSettingsDialogState extends State<EnhancedSettingsDialog> with TickerProviderStateMixin {
+class _SettingsDialogState extends State<SettingsDialog>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   late double _volume;
   late bool _isMusicEnabled;
@@ -31,7 +32,7 @@ class _EnhancedSettingsDialogState extends State<EnhancedSettingsDialog> with Ti
     _volume = widget.initialVolume;
     _isMusicEnabled = widget.initialMusicEnabled;
     _tabController = TabController(length: 2, vsync: this);
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,

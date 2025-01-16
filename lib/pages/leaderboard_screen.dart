@@ -1,12 +1,11 @@
 import 'dart:math' show pi;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
 import 'package:easy_ads_flutter/easy_ads_flutter.dart';
 import '../models/leaderboard_entry.dart';
 import '../services/leaderboard_service.dart';
 import 'package:games_services/games_services.dart' as games_services;
-
-import '../services/play_games_service.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   final String? username;
@@ -25,9 +24,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   bool _isCelebrating = false;
   final List<LeaderboardEntry> _globalLeaderboard = [];
   final List<LeaderboardEntry> _weeklyLeaderboard = [];
-    bool _useGameServices = false;
-    bool _isLoading = true;
-  final PlayGamesService _playGamesService = PlayGamesService();
+  bool _useGameServices = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -35,11 +33,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     _tabController = TabController(length: 2, vsync: this);
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 3));
-         _checkGameServices();
+    _checkGameServices();
     _loadLeaderboards();
     EasyAds.instance.loadAd();
   }
- Future<void> _checkGameServices() async {
+
+  Future<void> _checkGameServices() async {
     try {
       final isSignedIn = await games_services.GameAuth.isSignedIn;
       setState(() {
@@ -68,18 +67,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
     _checkForCelebration();
   }
-   LeaderboardEntry _convertGameServicesScore(games_services.LeaderboardScoreData score) {
+
+  LeaderboardEntry _convertGameServicesScore(
+      games_services.LeaderboardScoreData score) {
     // Parse player name from formatted rank which includes the name
-    String name = score..split(' ').skip(1).join(' ');
+    String name = score.scoreHolder.displayName;
     if (name.isEmpty) name = 'Player ${score.rank}';
 
     return LeaderboardEntry(
       playerName: name,
-      score: score.score ?? 0,
-      timestamp: DateTime.now(), // Game Services doesn't provide date, use current
+      score: score.rawScore,
+      timestamp:
+          DateTime.now(), // Game Services doesn't provide date, use current
     );
   }
-   Future<void> _loadGameServicesLeaderboard() async {
+
+  Future<void> _loadGameServicesLeaderboard() async {
     try {
       final scores = await games_services.Leaderboards.loadLeaderboardScores(
         androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
@@ -91,38 +94,39 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       if (scores != null) {
         setState(() {
           _globalLeaderboard.clear();
-          _globalLeaderboard.addAll(scores.map((score) => LeaderboardEntry(
-                playerName: score.playerName ?? 'Unknown',
-                score: score.value ?? 0,
-                timestamp: score.date,
-              )));
+          _globalLeaderboard.addAll(
+            scores.map(_convertGameServicesScore),
+          );
         });
 
-        // Load weekly scores
-        final weeklyScores = await games_services.Leaderboards.loadLeaderboardScores(
+        // Load weekly scores - using recent instead of weekly since TimeScope.weekly isn't available
+        final recentScores =
+            await games_services.Leaderboards.loadLeaderboardScores(
           androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
           scope: games_services.PlayerScope.global,
-          timeScope: games_services.TimeScope.weekly,
+          timeScope: games_services.TimeScope
+              .today, // Use today or allTime since weekly isn't available
           maxResults: 20,
         );
 
-        if (weeklyScores != null) {
+        if (recentScores != null) {
           setState(() {
             _weeklyLeaderboard.clear();
-            _weeklyLeaderboard.addAll(weeklyScores.map((score) => LeaderboardEntry(
-                  playerName: score.playerName ?? 'Unknown',
-                  score: score.value ?? 0,
-                  timestamp: score.date,
-                )));
+            _weeklyLeaderboard.addAll(
+              recentScores.map(_convertGameServicesScore),
+            );
           });
         }
       }
     } catch (e) {
-      print('Error loading Game Services leaderboard: $e');
+      if (kDebugMode) {
+        print('Error loading Game Services leaderboard: $e');
+      }
       // Fallback to Firebase if Game Services fails
       await _loadFirebaseLeaderboard();
     }
   }
+
   Future<void> _loadFirebaseLeaderboard() async {
     final global = await widget._leaderboardService.getLeaderboard();
     final weekly = await widget._leaderboardService.getWeeklyLeaderboard();
@@ -154,7 +158,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
       );
     } catch (e) {
-      print('Error showing Game Services leaderboard: $e');
+      if (kDebugMode) {
+        print('Error showing Game Services leaderboard: $e');
+      }
       // Show a snackbar to inform the user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -194,8 +200,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       _isCelebrating = true;
     }
   }
-
-
 
   @override
   void dispose() {
@@ -382,11 +386,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-       appBar: AppBar(
-        title: Text(_useGameServices 
-          ? 'Game Services Leaderboard' 
-          : 'Leaderboard'
-        ),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Text(
+            _useGameServices ? 'Game Play Leaderboard' : ''),
         actions: [
           if (_useGameServices)
             IconButton(
@@ -420,10 +423,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
                 SliverAppBar(
+                  //automaticallyImplyLeading: false,
                   expandedHeight: 200,
                   floating: true,
                   pinned: true,
-                  backgroundColor: Colors.transparent,
+                  //  backgroundColor: Colors.transparent,
                   flexibleSpace: FlexibleSpaceBar(
                     title: const Text(
                       '🏆 Leaderboard',
