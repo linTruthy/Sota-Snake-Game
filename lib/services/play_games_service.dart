@@ -1,29 +1,75 @@
 import 'package:flutter/foundation.dart';
-import 'package:games_services/games_services.dart';
+import 'package:games_services/games_services.dart' as games_services;
 
 class PlayGamesService {
-  static Future<void> initialize() async {
+  // Singleton instance
+  static final PlayGamesService _instance = PlayGamesService._internal();
+  factory PlayGamesService() => _instance;
+  PlayGamesService._internal();
+
+  // Track authentication state
+  bool _isSignedIn = false;
+  bool get isSignedIn => _isSignedIn;
+
+  // Initialize services and attempt sign in
+  Future<void> initialize() async {
     try {
-      await GamesServices.signIn();
+      await signIn();
     } catch (e) {
       if (kDebugMode) {
-        print('Error signing in to Play Games Services: $e');
+        print('Error initializing Play Games Services: $e');
       }
     }
   }
 
-  static Future<void> submitScore(int score) async {
-    Score scoreData = Score(
-      androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
-      iOSLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
-      value: score,
-    );
+  // Sign in to game services
+  Future<void> signIn() async {
+    try {
+      await games_services.GameAuth.signIn();
+      final isSignedIn = await games_services.GameAuth.isSignedIn;
+      _isSignedIn = isSignedIn;
+
+      if (_isSignedIn) {
+        // Load player info after successful sign in
+        await _loadPlayerInfo();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error signing in to Play Games Services: $e');
+      }
+      _isSignedIn = false;
+    }
+  }
+
+  // Load player information
+  Future<void> _loadPlayerInfo() async {
+    try {
+      final playerId = await games_services.Player.getPlayerID();
+      final playerName = await games_services.Player.getPlayerName();
+      if (kDebugMode) {
+        print('Player ID: $playerId');
+        print('Player Name: $playerName');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading player info: $e');
+      }
+    }
+  }
+
+  // Submit score to leaderboard
+  Future<void> submitScore(int score) async {
+    if (!_isSignedIn) return;
 
     try {
-      await GamesServices.submitScore(
-        score: scoreData,
-        //  boardID: 'YOUR_LEADERBOARD_ID',
+      final scoreData = games_services.Score(
+        androidLeaderboardID:
+            'CgkIv-Wvj_EHEAIQAg', // Your Android leaderboard ID
+        iOSLeaderboardID: 'sota_snake_leaderboard', // Your iOS leaderboard ID
+        value: score,
       );
+
+      await games_services.Leaderboards.submitScore(score: scoreData);
     } catch (e) {
       if (kDebugMode) {
         print('Error submitting score: $e');
@@ -31,12 +77,17 @@ class PlayGamesService {
     }
   }
 
-  static Future<void> showLeaderboard() async {
+  // Show leaderboard UI
+  Future<void> showLeaderboard() async {
+    if (!_isSignedIn) {
+      await signIn();
+      if (!_isSignedIn) return;
+    }
+
     try {
-      await GamesServices.showLeaderboards(
-// Suggested code may be subject to a license. Learn more: ~LicenseLog:2157467268.
-     //   iOSLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
-      //  androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
+      await games_services.Leaderboards.showLeaderboards(
+        iOSLeaderboardID: 'sota_snake_leaderboard',
+        androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
       );
     } catch (e) {
       if (kDebugMode) {
@@ -45,16 +96,19 @@ class PlayGamesService {
     }
   }
 
-  static Future<void> unlockAchievement(String achievementId) async {
-    Achievement achievement = Achievement(
-      androidID: achievementId,
-      iOSID: achievementId,
-      steps: 100,
-      showsCompletionBanner: true,
-    );
+  // Unlock an achievement
+  Future<void> unlockAchievement(String achievementId) async {
+    if (!_isSignedIn) return;
 
     try {
-      await GamesServices.unlock(achievement: achievement);
+      final achievement = games_services.Achievement(
+        androidID: achievementId,
+        iOSID: achievementId,
+        percentComplete: 100,
+        showsCompletionBanner: true,
+      );
+
+      await games_services.Achievements.unlock(achievement: achievement);
     } catch (e) {
       if (kDebugMode) {
         print('Error unlocking achievement: $e');
@@ -62,13 +116,68 @@ class PlayGamesService {
     }
   }
 
-  static showAchievements() {
+  // Increment progress for an achievement
+  Future<void> incrementAchievement(String achievementId, int steps) async {
+    if (!_isSignedIn) return;
+
     try {
-      GamesServices.showAchievements();
+      final achievement = games_services.Achievement(
+        androidID: achievementId,
+        iOSID: achievementId,
+        steps: steps,
+      );
+
+      await games_services.Achievements.increment(achievement: achievement);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error incrementing achievement: $e');
+      }
+    }
+  }
+
+  // Show achievements UI
+  Future<void> showAchievements() async {
+    if (!_isSignedIn) {
+      await signIn();
+      if (!_isSignedIn) return;
+    }
+
+    try {
+      await games_services.Achievements.showAchievements();
     } catch (e) {
       if (kDebugMode) {
         print('Error showing achievements: $e');
       }
     }
   }
+
+  // Load achievement data
+  Future<List<games_services.AchievementItemData>> loadAchievements() async {
+    if (!_isSignedIn) return [];
+
+    try {
+      final achievements = await games_services.Achievements.loadAchievements();
+      return achievements ?? [];
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading achievements: $e');
+      }
+      return [];
+    }
+  }
+
+  // Get player's score from leaderboard
+  Future<int?> getPlayerScore() async {
+    if (!_isSignedIn) return null;
+
+    try {
+      return await games_services.Player.getPlayerScore();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error getting player score: $e');
+      }
+      return null;
+    }
+  }
 }
+

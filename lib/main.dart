@@ -4,16 +4,18 @@ import 'package:easy_ads_flutter/easy_ads_flutter.dart';
 import 'package:sota_snake_game/pages/snake_game_screen.dart';
 
 import 'firebase_options.dart';
+import 'services/ad_id_manager.dart';
 import 'services/play_games_service.dart';
+import 'services/score_manager.dart';
 
-const IAdIdManager adIdManager = TestAdIdManager();
+const IAdIdManager adIdManager = AdIdManagerX();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  await PlayGamesService.initialize();
+   await PlayGamesService().initialize();
   await EasyAds.instance.initialize(
     isShowAppOpenOnAppStateChange: false,
     adIdManager,
@@ -25,6 +27,8 @@ void main() async {
     fbTestingId: 'd3b083f0-2987-4d05-a402-aba2011070f4',
     fbiOSAdvertiserTrackingEnabled: true,
   );
+
+ await ScoreManager().initialize();
   runApp(const MyApp());
 }
 

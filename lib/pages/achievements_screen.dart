@@ -46,13 +46,6 @@ class _EnhancedAchievementsScreenState extends State<EnhancedAchievementsScreen>
     _loadAchievements();
   }
 
-  // @override
-  // void dispose() {
-  //   _confettiController.dispose();
-  //   _animationController.dispose();
-  //   super.dispose();
-  // }
-
   Future<void> _loadAchievements() async {
     setState(() => _isLoading = true);
     try {

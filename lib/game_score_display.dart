@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:math' show pi;
 
+import 'package:sota_snake_game/services/score_manager.dart';
+
 class GameScoreDisplay extends StatefulWidget {
-  final int score;
-  final int highScore;
+  final ScoreManager scoreManager;
   final int level;
 
   const GameScoreDisplay({
     super.key,
-    required this.score,
-    required this.highScore,
+    required this.scoreManager,
     required this.level,
   });
 
@@ -78,7 +78,7 @@ class _GameScoreDisplayState extends State<GameScoreDisplay>
       animation: animation,
       builder: (context, child) {
         Widget content = Container(
-          width: 110,
+          width: 90,
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -108,7 +108,7 @@ class _GameScoreDisplayState extends State<GameScoreDisplay>
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: gradientColors[0],
                 ),
@@ -120,7 +120,7 @@ class _GameScoreDisplayState extends State<GameScoreDisplay>
                   Text(
                     value,
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: gradientColors[1],
                     ),
@@ -152,7 +152,7 @@ class _GameScoreDisplayState extends State<GameScoreDisplay>
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(5),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.3),
         borderRadius: BorderRadius.circular(24),
@@ -169,14 +169,14 @@ class _GameScoreDisplayState extends State<GameScoreDisplay>
         children: [
           _buildScoreCard(
             title: 'SCORE',
-            value: widget.score.toString(),
+            value: widget.scoreManager.getFormattedScore(),
             gradientColors: const [Colors.amber, Colors.orange],
             animation: _scoreAnimation,
             icon: Icons.star,
           ),
           _buildScoreCard(
             title: 'HIGH SCORE',
-            value: widget.highScore.toString(),
+            value: widget.scoreManager.getFormattedHighScore(),
             gradientColors: const [Colors.purple, Colors.blue],
             animation: _highScoreAnimation,
             icon: Icons.emoji_events,

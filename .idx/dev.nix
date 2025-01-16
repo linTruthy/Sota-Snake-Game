@@ -56,7 +56,7 @@
           manager = "flutter";
         };
         android = {
-          command = ["flutter" "run" "--machine" "-d" "android" "-d" "emulator-5556"];
+          command = ["flutter" "run" "--machine" "-d" "android" "-d" "emulator-5554"];
           manager = "flutter";
         };
       };

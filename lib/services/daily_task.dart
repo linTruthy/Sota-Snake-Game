@@ -8,7 +8,7 @@ import '../models/daily_task.dart';
 class DailyTaskService {
   static const String _lastGeneratedKey = 'lastGeneratedDate';
   static const String _tasksKey = 'dailyTasks';
-  
+
   static Future<List<DailyTask>> getDailyTasks() async {
     final prefs = await SharedPreferences.getInstance();
     final lastGenerated = prefs.getString(_lastGeneratedKey);

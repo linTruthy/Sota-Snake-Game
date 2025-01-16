@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' show pi;
 
 class EnhancedSettingsDialog extends StatefulWidget {
   final double initialVolume;

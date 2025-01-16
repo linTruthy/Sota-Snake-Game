@@ -1,17 +1,18 @@
+
 import 'dart:math';
 import 'package:flutter/material.dart';
-
 import '../models/power_up.dart';
 
-class SnakeGameBoard extends StatelessWidget {
+enum Direction { up, down, left, right }
+
+class SnakeGameBoard extends StatefulWidget {
   final int rows;
   final int columns;
   final List<Point<int>> snake;
   final Point<int>? food;
   final List<PowerUp> powerUps;
   final Duration snakeSpeed;
-  final Function(DragUpdateDetails) onVerticalDragUpdate;
-  final Function(DragUpdateDetails) onHorizontalDragUpdate;
+  final void Function(Direction) onDirectionChange; // Updated type signature
 
   const SnakeGameBoard({
     super.key,
@@ -21,93 +22,139 @@ class SnakeGameBoard extends StatelessWidget {
     required this.food,
     required this.powerUps,
     required this.snakeSpeed,
-    required this.onVerticalDragUpdate,
-    required this.onHorizontalDragUpdate,
+    required this.onDirectionChange,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Calculate responsive dimensions
-        double gridSize = min(constraints.maxWidth, constraints.maxHeight);
-        double cellSize = (gridSize - 32) / columns; // Account for padding
+  State<SnakeGameBoard> createState() => _SnakeGameBoardState();
+}
 
-        return Container(
-          // 3D Container with perspective effect
-          decoration: BoxDecoration(
-            color: Colors.black12,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 20,
-                spreadRadius: 2,
-                offset: const Offset(0, 10),
-              ),
-              BoxShadow(
-                color: Colors.green.withOpacity(0.1),
-                blurRadius: 30,
-                spreadRadius: -5,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: Transform(
-            transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.001) // Add subtle perspective
-              ..rotateX(0.05), // Slight tilt for 3D effect
-            alignment: Alignment.center,
-            child: ClipRRect(
+class _SnakeGameBoardState extends State<SnakeGameBoard> {
+  static const double minSwipeDistance = 10.0;
+  static const double diagonalThreshold = 0.5;
+
+  Offset? _startPosition;
+  Direction? _lastDirection;
+  DateTime _lastDirectionChange = DateTime.now();
+
+  static const debounceDuration = Duration(milliseconds: 100);
+
+  void _handlePanStart(DragStartDetails details) {
+    _startPosition = details.localPosition;
+  }
+
+  void _handlePanUpdate(DragUpdateDetails details) {
+    if (_startPosition == null) return;
+
+    if (DateTime.now().difference(_lastDirectionChange) < debounceDuration) {
+      return;
+    }
+
+    final dx = details.localPosition.dx - _startPosition!.dx;
+    final dy = details.localPosition.dy - _startPosition!.dy;
+
+    if (dx.abs() < minSwipeDistance && dy.abs() < minSwipeDistance) {
+      return;
+    }
+
+    final absDx = dx.abs();
+    final absDy = dy.abs();
+
+    final isDiagonal = (absDx / absDy).abs() > (1 - diagonalThreshold) &&
+        (absDx / absDy).abs() < (1 + diagonalThreshold);
+
+    Direction? newDirection;
+
+    if (!isDiagonal) {
+      if (absDx > absDy) {
+        newDirection = dx > 0 ? Direction.right : Direction.left;
+      } else {
+        newDirection = dy > 0 ? Direction.down : Direction.up;
+      }
+    } else {
+      if (absDx > absDy) {
+        newDirection = dx > 0 ? Direction.right : Direction.left;
+      } else {
+        newDirection = dy > 0 ? Direction.down : Direction.up;
+      }
+    }
+
+    if (newDirection != null && newDirection != _lastDirection) {
+      _lastDirection = newDirection;
+      _lastDirectionChange = DateTime.now();
+      widget.onDirectionChange(newDirection);
+      _startPosition = details.localPosition;
+    }
+  }
+
+  void _handlePanEnd(DragEndDetails details) {
+    _startPosition = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onPanStart: _handlePanStart,
+      onPanUpdate: _handlePanUpdate,
+      onPanEnd: _handlePanEnd,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          double gridSize = min(constraints.maxWidth, constraints.maxHeight);
+          double cellSize = (gridSize - 32) / widget.columns;
+
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.black12,
               borderRadius: BorderRadius.circular(24),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.black.withOpacity(0.8),
-                      Colors.black.withOpacity(0.6),
-                    ],
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 10),
                 ),
-                child: GestureDetector(
-                  onVerticalDragUpdate: onVerticalDragUpdate,
-                  onHorizontalDragUpdate: onHorizontalDragUpdate,
-                  child: AspectRatio(
-                    aspectRatio: columns / rows,
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        childAspectRatio: 1,
-                        crossAxisSpacing: 2,
-                        mainAxisSpacing: 2,
-                      ),
-                      itemCount: rows * columns,
-                      itemBuilder: (context, index) {
-                        final x = index % columns;
-                        final y = index ~/ columns;
-                        final point = Point(x, y);
-                        
-                        return GameCell(
-                          point: point,
-                          snake: snake,
-                          food: food,
-                          powerUps: powerUps,
-                          snakeSpeed: snakeSpeed,
-                          cellSize: cellSize,
-                        );
-                      },
-                    ),
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.1),
+                  blurRadius: 30,
+                  spreadRadius: -5,
+                  offset: const Offset(0, -5),
+                ),
+              ],
+            ),
+            child: Transform(
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.001)
+                ..rotateX(0.05),
+              alignment: Alignment.center,
+              child: AspectRatio(
+                aspectRatio: widget.columns / widget.rows,
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: widget.columns,
+                    childAspectRatio: 1,
                   ),
+                  itemCount: widget.rows * widget.columns,
+                  itemBuilder: (context, index) {
+                    final x = index % widget.columns;
+                    final y = index ~/ widget.columns;
+                    final point = Point(x, y);
+
+                    return GameCell(
+                      point: point,
+                      snake: widget.snake,
+                      food: widget.food,
+                      powerUps: widget.powerUps,
+                      snakeSpeed: widget.snakeSpeed,
+                      cellSize: cellSize,
+                    );
+                  },
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -139,97 +186,19 @@ class GameCell extends StatelessWidget {
 
     return AnimatedContainer(
       duration: snakeSpeed,
-      curve: Curves.easeInOut,
-      child: Transform(
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.001)
-          ..translate(0.0, 0.0, isSnakeHead ? 4.0 : 0.0),
-        child: Container(
-          margin: EdgeInsets.all(cellSize * 0.05),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: _getCellColors(isSnakeHead, isSnakeBody, isFood, isPowerUp),
-            ),
-            borderRadius: BorderRadius.circular(cellSize * 0.2),
-            boxShadow: [
-              BoxShadow(
-                color: _getShadowColor(isSnakeHead, isSnakeBody, isFood, isPowerUp),
-                blurRadius: isSnakeHead ? 8 : 4,
-                spreadRadius: isSnakeHead ? 1 : 0,
-                offset: Offset(0, isSnakeHead ? 3 : 2),
-              ),
-            ],
-          ),
-          child: _buildCellContent(isSnakeHead, isFood, isPowerUp, cellSize),
-        ),
+      decoration: BoxDecoration(
+        color: _getCellColor(isSnakeHead, isSnakeBody, isFood, isPowerUp),
+        borderRadius: BorderRadius.circular(4),
       ),
+      margin: const EdgeInsets.all(1),
     );
   }
 
-  List<Color> _getCellColors(bool isHead, bool isBody, bool isFood, bool isPowerUp) {
-    if (isHead) {
-      return [
-        Colors.green[600]!,
-        Colors.green[800]!,
-      ];
-    } else if (isBody) {
-      return [
-        Colors.green[400]!,
-        Colors.green[600]!,
-      ];
-    } else if (isFood) {
-      return [
-        Colors.red[400]!,
-        Colors.red[600]!,
-      ];
-    } else if (isPowerUp) {
-      return [
-        Colors.blue[400]!,
-        Colors.blue[600]!,
-      ];
-    }
-    return [
-      Colors.grey[800]!,
-      Colors.grey[900]!,
-    ];
-  }
-
-  Color _getShadowColor(bool isHead, bool isBody, bool isFood, bool isPowerUp) {
-    if (isHead) return Colors.green.withOpacity(0.5);
-    if (isBody) return Colors.green.withOpacity(0.3);
-    if (isFood) return Colors.red.withOpacity(0.3);
-    if (isPowerUp) return Colors.blue.withOpacity(0.3);
-    return Colors.black.withOpacity(0.2);
-  }
-
-  Widget _buildCellContent(bool isHead, bool isFood, bool isPowerUp, double size) {
-    if (isHead) {
-      return Center(
-        child: Icon(
-          Icons.pets,
-          size: size * 0.5,
-          color: Colors.white.withOpacity(0.7),
-        ),
-      );
-    } else if (isFood) {
-      return Center(
-        child: Icon(
-          Icons.apple,
-          size: size * 0.4,
-          color: Colors.white.withOpacity(0.7),
-        ),
-      );
-    } else if (isPowerUp) {
-      return Center(
-        child: Icon(
-          Icons.flash_on,
-          size: size * 0.4,
-          color: Colors.white.withOpacity(0.7),
-        ),
-      );
-    }
-    return const SizedBox();
+  Color _getCellColor(bool isHead, bool isBody, bool isFood, bool isPowerUp) {
+    if (isHead) return Colors.green;
+    if (isBody) return Colors.green[700]!;
+    if (isFood) return Colors.red;
+    if (isPowerUp) return Colors.blue;
+    return Colors.grey[900]!;
   }
 }

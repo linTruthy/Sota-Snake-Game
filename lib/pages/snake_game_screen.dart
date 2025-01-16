@@ -8,9 +8,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../components/gameover_dialog.dart';
+import '../components/power_up_stack.dart';
 import '../game_score_display.dart';
+import '../models/daily_task.dart';
 import '../models/power_up.dart';
+import '../services/daily_task.dart';
 import '../services/play_games_service.dart';
+import '../services/score_manager.dart';
 import '../services/username_service.dart';
 import 'achievements_screen.dart';
 import 'daily_task_screen.dart';
@@ -18,10 +22,8 @@ import 'leaderboard_screen.dart';
 import '../services/leaderboard_service.dart';
 import 'package:in_app_update/in_app_update.dart';
 
-import 'powerup_indicator.dart';
 import 'settings_dialog.dart';
 import 'snake_game_board.dart';
-import 'username_dialog.dart';
 
 class SnakeGame extends StatefulWidget {
   const SnakeGame({super.key});
@@ -30,19 +32,21 @@ class SnakeGame extends StatefulWidget {
   State<SnakeGame> createState() => _SnakeGameState();
 }
 
-enum Direction { up, down, left, right }
-
 class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
-  // AppUpdateInfo? _updateInfo;
   Timer? _powerUpTimer;
-  int _remainingTime = 30; // Total time for power-up in seconds
-  double _progress = 1.0; // Progress from 1.0 (full) to 0.0 (empty)
-  bool _flexibleUpdateAvailable = false;
 
+  bool _flexibleUpdateAvailable = false;
+//
+  List<DailyTask> _activeTasks = [];
+  Map<String, Timer> _powerUpTimers = {};
+  List<PowerUp> _activePowerUps = [];
+  Map<String, int> _remainingTimes = {};
+  Map<String, Duration> _powerUpDurations = {};
+  final ScoreManager _scoreManager = ScoreManager();
+//
   Future<void> _checkForUpdate() async {
     InAppUpdate.checkForUpdate().then((info) {
       setState(() {
-        //   _updateInfo = info;
         _flexibleUpdateAvailable = info.flexibleUpdateAllowed;
         if (info.updateAvailability == UpdateAvailability.updateAvailable) {
           if (_flexibleUpdateAvailable) {
@@ -71,8 +75,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   bool isGameOver = false;
   bool isPaused = false;
   Timer? timer;
-  int score = 0;
-  int highScore = 0;
+  //int score = 0;
+  //int highScore = 0;
   int level = 1;
   Duration snakeSpeed = initialSnakeSpeed;
   List<PowerUp> powerUps = [];
@@ -117,36 +121,67 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   String? powerUpString;
   String powerUpType = 'speedBoost';
   void activatePowerUp(PowerUp powerUp) {
-    isPowerUp = true;
+    setState(() {
+      _activePowerUps.add(powerUp);
+      _remainingTimes[powerUp.id] = powerUp.duration.inSeconds;
+      _powerUpDurations[powerUp.id] = powerUp.duration;
+    });
+
+    // Apply power-up effect
+    _applyPowerUpEffect(powerUp);
+
+    // Start timer for this power-up
+    _powerUpTimers[powerUp.id] =
+        Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_remainingTimes[powerUp.id]! > 0) {
+          _remainingTimes[powerUp.id] = _remainingTimes[powerUp.id]! - 1;
+        } else {
+          _removePowerUp(powerUp);
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  void _applyPowerUpEffect(PowerUp powerUp) {
     switch (powerUp.type) {
       case 'speedBoost':
         snakeSpeed = snakeSpeed * 2;
         break;
       case 'scoreMultiplier':
-        scoreMultiplier = 2;
+        scoreMultiplier *= 2;
         break;
       case 'invincibility':
         isInvincible = true;
         break;
       case 'slowMotion':
-        snakeSpeed = snakeSpeed ~/ 4;
+        snakeSpeed = snakeSpeed ~/ 8;
         break;
     }
-    powerUpString = powerUp.type;
-    _remainingTime = powerUp.duration.inSeconds;
-    _progress = 1.0;
+  }
 
-    // Start the progress timer
-    _powerUpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingTime > 0) {
-        setState(() {
-          _remainingTime--;
-          _progress = _remainingTime / powerUp.duration.inSeconds;
-        });
-      } else {
-        timer.cancel();
-        endPowerUp(powerUp);
-      }
+  void _removePowerUp(PowerUp powerUp) {
+    // Remove the power-up effect
+    switch (powerUp.type) {
+      case 'speedBoost':
+        snakeSpeed = initialSnakeSpeed;
+        break;
+      case 'scoreMultiplier':
+        scoreMultiplier ~/= 2;
+        break;
+      case 'invincibility':
+        isInvincible = false;
+        break;
+      case 'slowMotion':
+        snakeSpeed = initialSnakeSpeed;
+        break;
+    }
+
+    setState(() {
+      _activePowerUps.removeWhere((p) => p.id == powerUp.id);
+      _remainingTimes.remove(powerUp.id);
+      _powerUpDurations.remove(powerUp.id);
     });
   }
 
@@ -203,24 +238,19 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     super.initState();
     loadInitialData();
     resetGame();
+    _scoreManager.resetScore();
+    _loadDailyTasks();
     EasyAds.instance.loadAd();
     _levelUpAnimationController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    // _levelUpAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
-    //   CurvedAnimation(
-    //       parent: _levelUpAnimationController, curve: Curves.easeInOut),
-    // );
 
     _highScoreAnimationController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    // _highScoreAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
-    //   CurvedAnimation(
-    //       parent: _highScoreAnimationController, curve: Curves.easeInOut),
-    // );
+
     _powerUpAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
@@ -241,11 +271,53 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     _checkForUpdate();
   }
 
+  Future<void> _loadDailyTasks() async {
+    final tasks = await DailyTaskService.getDailyTasks();
+    setState(() {
+      _activeTasks = tasks;
+    });
+  }
+
+  void _updateTaskProgress() {
+    if (_activeTasks.isEmpty) return;
+
+    for (var task in _activeTasks) {
+      if (task.isCompleted) continue;
+
+      int progress = 0;
+      switch (task.type) {
+        case TaskType.score:
+          progress = _scoreManager.currentScore;
+          break;
+        case TaskType.timeAlive:
+          // Convert game time to seconds
+          progress =
+              (timer?.tick ?? 0) * (snakeSpeed.inMilliseconds / 1000).round();
+          break;
+        case TaskType.powerUps:
+          // Count collected power-ups
+          progress = _activePowerUps.length;
+          break;
+        case TaskType.foodEaten:
+          // Calculate from snake length
+          progress = snake.length - initialSnakeLength;
+          break;
+        case TaskType.levelReached:
+          progress = level;
+          break;
+      }
+
+      if (progress > 0) {
+        DailyTaskService.updateTaskProgress(task.id, progress);
+      }
+    }
+  }
+
   Future<void> loadInitialData() async {
-    final highScoreFuture = loadHighScore();
+    //final highScoreFuture = loadHighScore();
     final usernameFuture = _loadUsername();
 
-    await Future.wait([highScoreFuture, usernameFuture]);
+    await Future.wait([usernameFuture]);
   }
 
   void startPowerUpAnimation() {
@@ -256,7 +328,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   Future<void> _loadUsername() async {
     final savedUsername = await UsernameService.getUsername();
     if (savedUsername == null) {
-      _promptForUsername();
+      _initializeUsername();
     } else {
       setState(() {
         username = savedUsername;
@@ -264,25 +336,24 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _promptForUsername() async {
-    String? username = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return const Username3DDialog();
-      },
-    );
+  void _initializeUsername() async {
+    String? username = await UsernameService.getUsername();
 
-    if (username != null && username.isNotEmpty) {
+    if (username == null && mounted) {
+      // Only show dialog if we couldn't get a username from Game Services
+      username = await UsernameService.requestUsername(context);
+    }
+
+    if (username != null) {
       setState(() {
-        username = username;
+        this.username = username;
       });
-      await UsernameService.setUsername(username!);
     }
   }
 
   void _submitScore() async {
     final leaderboardService = LeaderboardService();
+    final score = _scoreManager.currentScore;
     try {
       await leaderboardService.submitScore(username!, score);
     } catch (e) {
@@ -292,26 +363,29 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> loadHighScore() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      highScore = prefs.getInt('highScore') ?? 0;
-    });
-  }
+  // Future<void> loadHighScore() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   setState(() {
+  //     highScore = prefs.getInt('highScore') ?? 0;
+  //     final score = _scoreManager.currentScore;
+  //   });
+  // }
 
   void endGame() {
     timer?.cancel();
     isGameOver = true;
-
+    final score = _scoreManager.currentScore;
+    _updateTaskProgress();
+    final highScore = _scoreManager.highScore;
     if (score > highScore) {
-      highScore = score;
+      //  highScore = score;
       saveHighScore();
       showHighScoreEffect();
     }
     if (username != null) {
       _submitScore();
     }
-    PlayGamesService.submitScore(score);
+    PlayGamesService().submitScore(score);
     playSound('game_over.wav');
     //showGameOverDialog();
     showInterstitialAd();
@@ -319,6 +393,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
   Future<void> saveHighScore() async {
     final prefs = await SharedPreferences.getInstance();
+    final highScore = _scoreManager.highScore;
     await prefs.setInt('highScore', highScore);
   }
 
@@ -340,7 +415,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
     isGameOver = false;
     isPaused = false;
-    score = 0;
+     _scoreManager.resetScore();
     level = 1;
     snakeSpeed = initialSnakeSpeed;
     startGame();
@@ -356,7 +431,9 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   void rewardForDailyChallenge() {
-    score += 100; // Example reward
+    int score = _scoreManager.currentScore;
+    _scoreManager.updateScore(score + 100);
+
     //showDailyChallengeCompletionMessage();
     saveDailyChallengeCompletion();
   }
@@ -384,12 +461,17 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       if (!isPaused) {
         setState(() {
           moveSnake();
+          // Update tasks periodically (every 5 seconds)
+          if (timer.tick % (5000 ~/ snakeSpeed.inMilliseconds) == 0) {
+            _updateTaskProgress();
+          }
           if (isCollision()) {
             timer.cancel();
             isGameOver = true;
-
+            final score = _scoreManager.currentScore;
+            final highScore = _scoreManager.highScore;
             if (score > highScore) {
-              highScore = score;
+              //  highScore = score;
               saveHighScore();
               showHighScoreEffect();
             }
@@ -397,7 +479,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
             if (username != null) {
               _submitScore();
             }
-            PlayGamesService.submitScore(score);
+            PlayGamesService().submitScore(score);
             playSound('game_over.wav');
             showGameOverDialog();
             showInterstitialAd();
@@ -418,6 +500,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
               if (snake.first == powerUp.position) {
                 activatePowerUp(powerUp);
                 powerUps.remove(powerUp);
+                _updateTaskProgress();
               }
             }
             checkDailyChallengeCompletion();
@@ -479,26 +562,17 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   void increaseScore() {
-    score += (10 * scoreMultiplier) * level;
-    if (score % 100 == 0) {
-      level++;
-      snakeSpeed = Duration(
-          milliseconds:
-              max(50, initialSnakeSpeed.inMilliseconds - (level - 1) * 20));
-      timer?.cancel();
-      startGame();
-      showLevelUpEffect();
-      playSound('level_up.wav');
-      checkAndUnlockAchievements();
-    }
+    int newScore = calculateNewScore(); // Your score calculation
+    _scoreManager.updateScore(newScore);
   }
 
   void checkAndUnlockAchievements() {
+    final score = _scoreManager.currentScore;
     if (score >= 100) {
-      PlayGamesService.unlockAchievement('CgkIv-Wvj_EHEAIQAQ');
+      PlayGamesService().unlockAchievement('CgkIv-Wvj_EHEAIQAQ');
     }
     if (level >= 5) {
-      PlayGamesService.unlockAchievement('YOUR_LEVEL_5_ACHIEVEMENT_ID');
+      PlayGamesService().unlockAchievement('YOUR_LEVEL_5_ACHIEVEMENT_ID');
     }
   }
 
@@ -525,7 +599,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   void showInterstitialAd() {
-    EasyAds.instance.showAd(AdUnitType.interstitial);
+    EasyAds.instance
+        .showAd(AdUnitType.interstitial, adNetwork: AdNetwork.admob);
   }
 
   void showLevelUpEffect() {
@@ -618,532 +693,592 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Drawer(
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.grey[900]!,
-                Colors.grey[850]!,
-                Colors.grey[900]!,
-              ],
+        drawer: Drawer(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.grey[900]!,
+                  Colors.grey[850]!,
+                  Colors.grey[900]!,
+                ],
+              ),
             ),
-          ),
-          child: Column(
-            children: [
-              // Profile Header
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.green[900]!,
-                      Colors.grey[900]!,
-                    ],
+            child: Column(
+              children: [
+                // Profile Header
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.green[900]!,
+                        Colors.grey[900]!,
+                      ],
+                    ),
                   ),
-                ),
-                child: Stack(
-                  children: [
-                    // Animated Pattern Overlay
-                    ...List.generate(
-                      5,
-                      (index) => AnimatedPositioned(
-                        duration: const Duration(seconds: 2),
-                        curve: Curves.easeInOut,
-                        child: Transform.rotate(
-                          angle: pi / 4,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.white.withOpacity(0.05),
-                                  Colors.white.withOpacity(0.1),
-                                ],
-                                stops: const [0.4, 0.6],
+                  child: Stack(
+                    children: [
+                      // Animated Pattern Overlay
+                      ...List.generate(
+                        5,
+                        (index) => AnimatedPositioned(
+                          duration: const Duration(seconds: 2),
+                          curve: Curves.easeInOut,
+                          child: Transform.rotate(
+                            angle: pi / 4,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.white.withOpacity(0.05),
+                                    Colors.white.withOpacity(0.1),
+                                  ],
+                                  stops: const [0.4, 0.6],
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
 
-                    // Profile Content
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.green[400]!,
-                                  Colors.green[600]!,
+                      // Profile Content
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.green[400]!,
+                                    Colors.green[600]!,
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
                                 ],
                               ),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
+                              child: const Icon(Icons.person,
+                                  size: 40, color: Colors.white),
                             ),
-                            child: const Icon(Icons.person,
-                                size: 40, color: Colors.white),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            username ?? 'Guest',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green[900]!.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'Player Profile',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontSize: 14,
+                            const SizedBox(height: 16),
+                            Text(
+                              username ?? 'Guest',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green[900]!.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'Player Profile',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Menu Items
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _buildMenuItem(
+                        icon: CupertinoIcons.doc_checkmark,
+                        title: 'Daily Tasks',
+                        subtitle: 'New',
+                        onTap: () {
+                          Navigator.pop(context); // Close drawer
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DailyTasksScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuItem(
+                        icon: CupertinoIcons.settings,
+                        title: 'Settings',
+                        subtitle: isSoundMuted ? 'Sound: Off' : 'Sound: On',
+                        onTap: () => _showSettingsDialog(context),
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.leaderboard_rounded,
+                        title: 'Leaderboard',
+                        subtitle: 'View top players',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                LeaderboardScreen(username: username),
+                          ),
+                        ),
+                      ),
+                      _buildMenuItem(
+                        icon: CupertinoIcons.person,
+                        title: 'Profile',
+                        subtitle: username ?? 'Guest',
+                        onTap: _initializeUsername,
+                      ),
+                      _buildMenuItem(
+                        icon: CupertinoIcons.heart,
+                        title: 'Achievements',
+                        subtitle: 'View your progress',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) =>
+                                    const EnhancedAchievementsScreen()),
+                          );
+                        },
+                      ),
+                      _buildMenuItem(
+                        icon: CupertinoIcons.info_circle,
+                        title: 'How to Play',
+                        subtitle: 'View your progress',
+                        onTap: () => _showHowToPlayDialog(context),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Footer
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: Colors.grey[800]!,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.games, size: 16, color: Colors.grey[400]),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Sota Snake v1.1.1',
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Menu Items
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _buildMenuItem(
-                      icon: CupertinoIcons.doc_checkmark,
-                      title: 'Daily Tasks',
-                      subtitle: 'New',
-                      onTap: () {
-                        Navigator.pop(context); // Close drawer
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const DailyTasksScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildMenuItem(
-                      icon: CupertinoIcons.settings,
-                      title: 'Settings',
-                      subtitle: isSoundMuted ? 'Sound: Off' : 'Sound: On',
-                      onTap: () => _showSettingsDialog(context),
-                    ),
-                    _buildMenuItem(
-                      icon: Icons.leaderboard_rounded,
-                      title: 'Leaderboard',
-                      subtitle: 'View top players',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              LeaderboardScreen(username: username),
-                        ),
-                      ),
-                    ),
-                    _buildMenuItem(
-                      icon: CupertinoIcons.person,
-                      title: 'Profile',
-                      subtitle: username ?? 'Guest',
-                      onTap: _promptForUsername,
-                    ),
-                    _buildMenuItem(
-                      icon: CupertinoIcons.heart,
-                      title: 'Achievements',
-                      subtitle: 'View your progress',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  const EnhancedAchievementsScreen()),
-                        );
-                      },
-                    ),
-                    _buildMenuItem(
-                      icon: CupertinoIcons.info_circle,
-                      title: 'How to Play',
-                      subtitle: 'View your progress',
-                      onTap: () => _showHowToPlayDialog(context),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Footer
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                      color: Colors.grey[800]!,
-                      width: 1,
-                    ),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.games, size: 16, color: Colors.grey[400]),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Sota Snake v1.1.1',
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      'Truthy Systems',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(48), // Reduced height
-        child: AppBar(
-          automaticallyImplyLeading: false, // Disable default drawer button
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.black,
-                  Colors.black87,
-                  Colors.green.shade900,
-                ],
-              ),
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  // Menu Button wrapped in Builder
-                  Builder(
-                    builder: (BuildContext context) => IconButton(
-                      icon: Icon(Icons.menu, color: Colors.green.shade400),
-                      onPressed: () => Scaffold.of(context).openDrawer(),
-                    ),
-                  ),
-
-                  // Title and Username
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
                       Text(
-                        'Sota Snake',
+                        'Truthy Systems',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          foreground: Paint()
-                            ..shader = LinearGradient(
-                              colors: [
-                                Colors.green.shade400,
-                                Colors.green.shade200,
-                              ],
-                            ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
-                        ),
-                      ),
-                      Text(
-                        'Welcome, ${username ?? 'Guest'}',
-                        style: TextStyle(
+                          color: Colors.grey[400],
                           fontSize: 12,
-                          color: Colors.green.shade400.withOpacity(0.8),
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
                     ],
                   ),
-
-                  const Spacer(),
-
-                  // Sound Toggle Button
-                  IconButton(
-                    icon: Icon(
-                      isSoundMuted
-                          ? CupertinoIcons.volume_off
-                          : CupertinoIcons.volume_up,
-                      color: isSoundMuted
-                          ? Colors.red.shade400
-                          : Colors.green.shade400,
-                    ),
-                    onPressed: toggleSound,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          elevation: 0, // Remove default shadow
-        ),
-      ),
-      floatingActionButtonLocation:
-          FloatingActionButtonLocation.miniCenterDocked,
-      floatingActionButton: FloatingActionButton(
-        elevation: 10,
-        onPressed: togglePause,
-        backgroundColor: isPaused ? Colors.red : Colors.green,
-        shape: const CircleBorder(),
-        child: Icon(
-          isPaused ? CupertinoIcons.play_arrow_solid : CupertinoIcons.pause,
-          color: Colors.white,
-        ),
-      ),
-      body: Stack(children: [
-        Column(
-          children: [
-            // const EasySmartBannerAd(
-            //   priorityAdNetworks: [
-            //     AdNetwork.admob,
-            //     AdNetwork.unity,
-            //     AdNetwork.facebook,
-            //   ],
-            //   adSize: AdSize.banner,
-            // ),
-            if (isPowerUp)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: PowerUpIndicator(
-                  remainingTime: _remainingTime,
-                  duration: const Duration(seconds: 30),
-                  powerUpType: powerUpString ?? 'default',
-                  progress: _progress,
-                ),
-              ),
-            const SizedBox(height: 3),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: GameScoreDisplay(
-                score: score,
-                highScore: highScore,
-                level: level,
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SnakeGameBoard(
-                  rows: rows,
-                  columns: columns,
-                  snake: snake,
-                  food: food,
-                  powerUps: powerUps,
-                  snakeSpeed: snakeSpeed,
-                  onVerticalDragUpdate: (details) {
-                    if (details.delta.dy < 0) {
-                      changeDirection(Direction.up);
-                    } else if (details.delta.dy > 0) {
-                      changeDirection(Direction.down);
-                    }
-                  },
-                  onHorizontalDragUpdate: (details) {
-                    if (details.delta.dx < 0) {
-                      changeDirection(Direction.left);
-                    } else if (details.delta.dx > 0) {
-                      changeDirection(Direction.right);
-                    }
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(
-              height: 3,
-            ),
-            // if (!isGameOver || isPaused)
-            //   const EasySmartBannerAd(
-            //     priorityAdNetworks: [
-            //       AdNetwork.admob,
-            //       AdNetwork.unity,
-            //       AdNetwork.facebook,
-            //     ],
-            //     adSize: AdSize.largeBanner,
-            //   ),
-            if (isGameOver)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Game Over!',
-                      style: TextStyle(fontSize: 24, color: Colors.red),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            backgroundColor: Colors.deepOrange, // Text color
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18.0),
-                            ),
-                            elevation: 8,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              resetGame();
-                            });
-                          },
-                          child: const Text('Play Again'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        if (isPowerUp)
-          Positioned(
-            top: 10,
-            left: 100,
-            child: AnimatedBuilder(
-              animation: _powerUpAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _powerUpAnimation.value,
-                  child: const Icon(
-                    Icons.flash_on,
-                    color: Colors.yellow,
-                    size: 24,
-                  ),
-                );
-              },
-            ),
-          ),
-      ]),
-      bottomNavigationBar: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.green[900]!,
-              Colors.green[800]!,
-              Colors.green[700]!,
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // 3D depth effect
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.2),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-
-            // Main content
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                // Leaderboard button
-                _buildAnimatedButton(
-                  icon: Icons.leaderboard_rounded,
-                  color: Colors.amber,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          LeaderboardScreen(username: username),
-                    ),
-                  ),
-                ),
-
-                // Spacer for FAB
-                const SizedBox(width: 80),
-
-                // Reset button
-                _buildAnimatedButton(
-                  icon: CupertinoIcons.refresh,
-                  color: Colors.blue,
-                  onTap: () {
-                    setState(() {
-                      resetGame();
-                    });
-                  },
                 ),
               ],
             ),
-
-            // Floating Action Button
-            Positioned(
-              top: -30,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: _buildFloatingActionButton(),
+          ),
+        ),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(48), // Reduced height
+          child: AppBar(
+            automaticallyImplyLeading: false, // Disable default drawer button
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black,
+                    Colors.black87,
+                    Colors.green.shade900,
+                  ],
+                ),
               ),
-            ),
+              child: SafeArea(
+                child: Row(
+                  children: [
+                    // Menu Button wrapped in Builder
+                    Builder(
+                      builder: (BuildContext context) => IconButton(
+                        icon: Icon(Icons.menu, color: Colors.green.shade400),
+                        onPressed: () => Scaffold.of(context).openDrawer(),
+                      ),
+                    ),
 
-            // Top shine effect
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      Colors.white.withOpacity(0.3),
-                      Colors.transparent,
-                    ],
-                  ),
+                    // Title and Username
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sota Snake',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            foreground: Paint()
+                              ..shader = LinearGradient(
+                                colors: [
+                                  Colors.green.shade400,
+                                  Colors.green.shade200,
+                                ],
+                              ).createShader(
+                                  const Rect.fromLTWH(0, 0, 200, 70)),
+                          ),
+                        ),
+                        Text(
+                          'Welcome, ${username ?? 'Guest'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green.shade400.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(),
+
+                    // Sound Toggle Button
+                    IconButton(
+                      icon: Icon(
+                        isSoundMuted
+                            ? CupertinoIcons.volume_off
+                            : CupertinoIcons.volume_up,
+                        color: isSoundMuted
+                            ? Colors.red.shade400
+                            : Colors.green.shade400,
+                      ),
+                      onPressed: toggleSound,
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+            elevation: 0, // Remove default shadow
+          ),
+        ),
+        floatingActionButtonLocation:
+            FloatingActionButtonLocation.miniCenterDocked,
+        floatingActionButton: FloatingActionButton(
+          elevation: 10,
+          onPressed: togglePause,
+          backgroundColor: isPaused ? Colors.red : Colors.green,
+          shape: const CircleBorder(),
+          child: Icon(
+            isPaused ? CupertinoIcons.play_arrow_solid : CupertinoIcons.pause,
+            color: Colors.white,
+          ),
+        ),
+        body: Stack(children: [
+          Column(
+            children: [
+              if (_activePowerUps.isEmpty)
+                const EasySmartBannerAd(
+                  priorityAdNetworks: [
+                    AdNetwork.admob,
+                    AdNetwork.unity,
+                    AdNetwork.facebook,
+                  ],
+                  adSize: AdSize.banner,
+                ),
+              if (_activePowerUps.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: PowerUpStack(
+                    powerUps: _activePowerUps,
+                    remainingTimes: _remainingTimes,
+                    durations: _powerUpDurations,
+                  ),
+                ),
+              const SizedBox(height: 3),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: GameScoreDisplay(
+                  scoreManager: _scoreManager,
+                  level: level,
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(3.0),
+                  child: SnakeGameBoard(
+                    rows: rows,
+                    columns: columns,
+                    snake: snake,
+                    food: food,
+                    powerUps: powerUps,
+                    snakeSpeed: snakeSpeed,
+                    onDirectionChange: (Direction newDirection) {
+                      if (!isPaused && !isGameOver) {
+                        setState(() {
+                          changeDirection(newDirection);
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(
+                height: 3,
+              ),
+              if (!isGameOver || isPaused) ...[
+                if (_activePowerUps.isEmpty)
+                  const EasySmartBannerAd(
+                    priorityAdNetworks: [
+                      AdNetwork.admob,
+                      AdNetwork.unity,
+                      AdNetwork.facebook,
+                    ],
+                    adSize: AdSize.banner,
+                  )
+              ],
+              if (isGameOver)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Game Over!',
+                        style: TextStyle(fontSize: 24, color: Colors.red),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.deepOrange, // Text color
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18.0),
+                              ),
+                              elevation: 8,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                resetGame();
+                              });
+                            },
+                            child: const Text('Play Again'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          if (isPowerUp)
+            Positioned(
+              top: 10,
+              left: 100,
+              child: AnimatedBuilder(
+                animation: _powerUpAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _powerUpAnimation.value,
+                    child: const Icon(
+                      Icons.flash_on,
+                      color: Colors.yellow,
+                      size: 24,
+                    ),
+                  );
+                },
+              ),
+            ),
+        ]),
+        bottomNavigationBar: Container(
+          height: 68,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.grey[900]!,
+                Colors.grey[850]!,
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, -3),
+              ),
+              BoxShadow(
+                color: Colors.green.withOpacity(0.1),
+                blurRadius: 15,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Top Glow Line
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 1,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.green.withOpacity(0.3),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Main Content
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  // Leaderboard Button
+                  _buildGlowingButton(
+                    icon: CupertinoIcons.graph_circle_fill,
+                    color: Colors.amber,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            LeaderboardScreen(username: username),
+                      ),
+                    ),
+                    glowColor: Colors.amber.withOpacity(0.3),
+                  ),
+
+                  // Center Play/Pause Button
+                  Transform.translate(
+                    offset: const Offset(0, -25),
+                    child: _buildGlowingButton(
+                      icon: isPaused
+                          ? CupertinoIcons.play_arrow
+                          : CupertinoIcons.pause,
+                      color: Colors.green,
+                      onTap: togglePause,
+                      isLarge: true,
+                      glowColor: Colors.green.withOpacity(0.3),
+                    ),
+                  ),
+
+                  // Reset Button
+                  _buildGlowingButton(
+                    icon: CupertinoIcons.refresh,
+                    color: Colors.blue,
+                    onTap: () {
+                      setState(() {
+                        resetGame();
+                      });
+                    },
+                    glowColor: Colors.blue.withOpacity(0.3),
+                  ),
+                ],
+              ),
+
+              // Bottom Glow Line
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 1,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.green.withOpacity(0.2),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ));
+  }
+
+  Widget _buildGlowingButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    bool isLarge = false,
+    required Color glowColor,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(isLarge ? 30 : 15),
+        boxShadow: [
+          BoxShadow(
+            color: glowColor,
+            blurRadius: 15,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(isLarge ? 30 : 15),
+          child: Container(
+            padding: EdgeInsets.all(isLarge ? 20 : 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  color.withOpacity(0.8),
+                  color.withOpacity(0.6),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(isLarge ? 38 : 15),
+              border: Border.all(
+                color: color.withOpacity(0.3),
+                width: isLarge ? 2 : 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: isLarge ? 28 : 20,
+              color: Colors.white,
+            ),
+          ),
         ),
       ),
     );
@@ -1158,94 +1293,11 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     _highScoreAnimationController.dispose();
     _powerUpTimer?.cancel();
     _powerUpAnimationController.dispose();
+    for (var timer in _powerUpTimers.values) {
+      timer.cancel();
+    }
+    _powerUpTimers.clear();
     super.dispose();
-  }
-
-  Widget _buildAnimatedButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 1.0, end: 1.0),
-      duration: const Duration(milliseconds: 200),
-      builder: (context, scale, child) {
-        return GestureDetector(
-          onTapDown: (_) => setState(() {}),
-          onTapUp: (_) => setState(() {}),
-          onTap: onTap,
-          child: Transform.scale(
-            scale: scale,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    color.withOpacity(0.8),
-                    color,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: Colors.white, size: 28),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFloatingActionButton() {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 1.0, end: 1.0),
-      duration: const Duration(milliseconds: 200),
-      builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: GestureDetector(
-            onTapDown: (_) => setState(() {}),
-            onTapUp: (_) => setState(() {}),
-            onTap: togglePause,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    isPaused ? Colors.red[600]! : Colors.green[600]!,
-                    isPaused ? Colors.red[400]! : Colors.green[400]!,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color:
-                        (isPaused ? Colors.red : Colors.green).withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Icon(
-                isPaused ? CupertinoIcons.play_fill : CupertinoIcons.pause_fill,
-                color: Colors.white,
-                size: 32,
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 
   void _showHowToPlayDialog(BuildContext context) {
@@ -1378,8 +1430,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return GameOverDialog(
-          score: score,
-          highScore: highScore,
+          score: _scoreManager.currentScore,
+          highScore: _scoreManager.highScore,
           onPlayAgain: () {
             Navigator.of(context).pop();
             setState(() {
@@ -1424,7 +1476,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   // Revert effects and show snackbar when the power-up ends
   void endPowerUp(PowerUp powerUp) {
     setState(() {
-      _progress = 0.0;
       isPowerUp = false;
     });
     switch (powerUp.type) {
@@ -1466,16 +1517,26 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     powerUps.remove(powerUp);
   }
 
-  // Determine the progress bar color based on the remaining time
-  Color _getProgressColor() {
-    if (_remainingTime >= 20) {
-      return Colors.green;
-    } else if (_remainingTime >= 10) {
-      return Colors.orange;
-    } else {
-      return Colors.red;
+  int calculateNewScore() {
+    int score = _scoreManager.currentScore;
+    score += (10 * scoreMultiplier) * level;
+    _updateTaskProgress();
+    if (score % 100 == 0) {
+      level++;
+      _updateTaskProgress();
+      snakeSpeed = Duration(
+          milliseconds:
+              max(50, initialSnakeSpeed.inMilliseconds - (level - 1) * 20));
+      timer?.cancel();
+      startGame();
+      showLevelUpEffect();
+      playSound('level_up.wav');
+      checkAndUnlockAchievements();
     }
+    return score;
   }
+
+  // Determine the progress bar color based on the remaining time
 }
 
 String _getPowerUpString(dynamic powerUpString) {
