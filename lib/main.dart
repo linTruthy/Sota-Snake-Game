@@ -1,7 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_ads_flutter/easy_ads_flutter.dart';
-import 'package:sota_snake_game/pages/snake_game_screen.dart';
+import 'package:sota_snake_game/app.dart';
 
 import 'firebase_options.dart';
 import 'services/ad_id_manager.dart';
@@ -15,7 +15,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-   await PlayGamesService().initialize();
+  await PlayGamesService().initialize();
   await EasyAds.instance.initialize(
     isShowAppOpenOnAppStateChange: false,
     adIdManager,
@@ -28,22 +28,6 @@ void main() async {
     fbiOSAdvertiserTrackingEnabled: true,
   );
 
- await ScoreManager().initialize();
+  await ScoreManager().initialize();
   runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sota Snake Game',
-      theme: ThemeData(
-        primarySwatch: Colors.green,
-        brightness: Brightness.dark,
-      ),
-      home: const SnakeGame(),
-    );
-  }
 }

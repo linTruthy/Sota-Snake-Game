@@ -11,7 +11,8 @@ class TutorialOverlay extends StatefulWidget {
   State<TutorialOverlay> createState() => _TutorialOverlayState();
 }
 
-class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProviderStateMixin {
+class _TutorialOverlayState extends State<TutorialOverlay>
+    with SingleTickerProviderStateMixin {
   int currentStep = 0;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -26,7 +27,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
     ),
     TutorialStep(
       title: "Control Your Snake",
-      description: "Swipe in any direction to move your snake. Collect food to grow longer and score points!",
+      description:
+          "Swipe in any direction to move your snake. Collect food to grow longer and score points!",
       alignment: Alignment.bottomCenter,
       highlightArea: const RelativeRect.fromLTRB(50, 200, 50, 100),
     ),
@@ -42,13 +44,15 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
     ),
     TutorialStep(
       title: "Track Your Progress",
-      description: "Watch your score grow and level up as you play. Try to beat the high score!",
+      description:
+          "Watch your score grow and level up as you play. Try to beat the high score!",
       alignment: Alignment.topCenter,
       highlightArea: const RelativeRect.fromLTRB(20, 20, 20, 400),
     ),
     TutorialStep(
       title: "Daily Challenges 🎯",
-      description: "Complete daily tasks to earn bonus points and climb the leaderboard!",
+      description:
+          "Complete daily tasks to earn bonus points and climb the leaderboard!",
       alignment: Alignment.centerLeft,
       highlightArea: const RelativeRect.fromLTRB(20, 100, 200, 100),
     ),
@@ -128,7 +132,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final currentTutorial = tutorialSteps[currentStep];
-    
+
     return Material(
       type: MaterialType.transparency,
       child: Stack(
@@ -187,7 +191,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
                                 (index) => Expanded(
                                   child: Container(
                                     height: 4,
-                                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 2),
                                     decoration: BoxDecoration(
                                       color: index <= currentStep
                                           ? Colors.green

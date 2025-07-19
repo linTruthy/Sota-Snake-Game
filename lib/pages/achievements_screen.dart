@@ -1,6 +1,7 @@
 import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
+import 'package:sota_snake_game/services/achievement_service.dart';
 import '../models/achievement.dart';
 
 class EnhancedAchievementsScreen extends StatefulWidget {

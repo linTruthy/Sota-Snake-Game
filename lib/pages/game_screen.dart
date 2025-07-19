@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../components/gameover_dialog.dart';
 import '../components/power_up_stack.dart';
-import '../game_score_display.dart';
+import '../components/game_score_display.dart';
 import '../models/daily_task.dart';
 import '../models/power_up.dart';
 import '../services/daily_task.dart';
@@ -23,8 +23,8 @@ import 'leaderboard_screen.dart';
 import '../services/leaderboard_service.dart';
 import 'package:in_app_update/in_app_update.dart';
 
-import 'settings_dialog.dart';
-import 'snake_game_board.dart';
+import '../components/settings_dialog.dart';
+import 'game_board.dart';
 
 class SnakeGame extends StatefulWidget {
   const SnakeGame({super.key});
