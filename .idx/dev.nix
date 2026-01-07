@@ -56,10 +56,10 @@
         #   command = ["flutter" "run" "--machine" "-d" "web-server" "--web-hostname" "0.0.0.0" "--web-port" "$PORT"];
         #   manager = "flutter";
         # };
-        # android = {
-        #   command = [ "flutter" "run" "--machine" "-d" "android" "-d" "emulator-5554" ];
-        #   manager = "flutter";
-        # };
+        android = {
+          command = [ "flutter" "run" "--machine" "-d" "android" "-d" "emulator-5554" ];
+          manager = "flutter";
+        };
       };
     };
   };
