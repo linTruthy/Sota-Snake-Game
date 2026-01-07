@@ -27,7 +27,6 @@ class DailyTaskService {
   }
 
   static List<DailyTask> _generateDailyTasks() {
-    final random = Random();
     final tasks = <DailyTask>[];
     final taskTypes = TaskType.values.toList()..shuffle();
 

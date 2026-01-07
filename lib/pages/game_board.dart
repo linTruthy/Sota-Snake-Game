@@ -79,7 +79,7 @@ class _SnakeGameBoardState extends State<SnakeGameBoard> {
       }
     }
 
-    if (newDirection != null && newDirection != _lastDirection) {
+    if (newDirection != _lastDirection) {
       _lastDirection = newDirection;
       _lastDirectionChange = DateTime.now();
       widget.onDirectionChange(newDirection);

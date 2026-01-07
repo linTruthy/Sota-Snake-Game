@@ -86,12 +86,10 @@ class _EnhancedAchievementsScreenState extends State<EnhancedAchievementsScreen>
     }
 
     // Apply tier filter
-    if (_selectedTier != null) {
-      filtered = filtered
-          .where((achievement) => achievement.tier == _selectedTier)
-          .toList();
-    }
-
+    filtered = filtered
+        .where((achievement) => achievement.tier == _selectedTier)
+        .toList();
+  
     // Apply sorting
     filtered.sort((a, b) {
       switch (_sortBy) {
@@ -276,7 +274,7 @@ class _EnhancedAchievementsScreenState extends State<EnhancedAchievementsScreen>
               // Sort Filter
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _sortBy,
+                  initialValue: _sortBy,
                   onChanged: (String? newValue) {
                     if (newValue != null) {
                       setState(() {

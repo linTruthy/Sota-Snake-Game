@@ -1,5 +1,0 @@
-package com.truthysystems.sota
-
-import io.flutter.embedding.android.FlutterActivity
-
-class MainActivity: FlutterActivity()

@@ -25,7 +25,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   final List<LeaderboardEntry> _globalLeaderboard = [];
   final List<LeaderboardEntry> _weeklyLeaderboard = [];
   bool _useGameServices = false;
-  bool _isLoading = true;
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -52,7 +52,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   Future<void> _loadLeaderboards() async {
     setState(() {
-      _isLoading = true;
+      isLoading = true;
     });
 
     if (_useGameServices) {
@@ -62,7 +62,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     }
 
     setState(() {
-      _isLoading = false;
+      isLoading = false;
     });
 
     _checkForCelebration();
