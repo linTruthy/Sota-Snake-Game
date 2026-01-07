@@ -1,6 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:easy_ads_flutter/easy_ads_flutter.dart';
+//import 'package:easy_ads_flutter/easy_ads_flutter.dart';
 import 'package:sota_snake_game/app.dart';
 
 import 'firebase_options.dart';
@@ -9,7 +9,7 @@ import 'services/play_games_service.dart';
 import 'services/score_manager.dart';
 import 'services/score_sync_manager.dart';
 
-const IAdIdManager adIdManager = AdIdManagerX();
+// const IAdIdManager adIdManager = AdIdManagerX();
 // void main() async {
 //   WidgetsFlutterBinding.ensureInitialized();
 
@@ -58,21 +58,21 @@ void main() async {
       debugPrint("Game Services init failed (non-fatal): $e");
     }
 
-    try {
-      await EasyAds.instance.initialize(
-        isShowAppOpenOnAppStateChange: false,
-        adIdManager,
-        unityTestMode: false,
-        fbTestMode: false,
-        adMobAdRequest: const AdRequest(),
-        admobConfiguration: RequestConfiguration(
-            testDeviceIds: ["73D83286C35132200529A93C555F5FD6"]),
-        fbTestingId: 'd3b083f0-2987-4d05-a402-aba2011070f4',
-        fbiOSAdvertiserTrackingEnabled: true,
-      );
-    } catch (e) {
-      debugPrint("Ad SDK Init Failed: $e");
-      // App continues working without Ads
-    }
+    // try {
+    //   // await EasyAds.instance.initialize(
+    //   //   isShowAppOpenOnAppStateChange: false,
+    //   //   adIdManager,
+    //   //   unityTestMode: false,
+    //   //   fbTestMode: false,
+    //   //   adMobAdRequest: const AdRequest(),
+    //   //   admobConfiguration: RequestConfiguration(
+    //   //       testDeviceIds: ["73D83286C35132200529A93C555F5FD6"]),
+    //   //   fbTestingId: 'd3b083f0-2987-4d05-a402-aba2011070f4',
+    //   //   fbiOSAdvertiserTrackingEnabled: true,
+    //   // );
+    // } catch (e) {
+    //   debugPrint("Ad SDK Init Failed: $e");
+    //   // App continues working without Ads
+    // }
   });
 }

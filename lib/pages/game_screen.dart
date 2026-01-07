@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:confetti/confetti.dart';
-import 'package:easy_ads_flutter/easy_ads_flutter.dart';
+//import 'package:easy_ads_flutter/easy_ads_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -271,7 +271,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     resetGame();
     _scoreManager.resetScore();
     _loadDailyTasks();
-    EasyAds.instance.loadAd();
+ //   EasyAds.instance.loadAd();
     _taskConfettiController =
         ConfettiController(duration: const Duration(seconds: 2));
     _levelUpAnimationController = AnimationController(
@@ -455,7 +455,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     PlayGamesService().submitScore(score);
     playSound('game_over.wav');
     //showGameOverDialog();
-    showInterstitialAd();
+   // showInterstitialAd();
   }
 
   Future<void> saveHighScore() async {
@@ -550,7 +550,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
             PlayGamesService().submitScore(score);
             playSound('game_over.wav');
             showGameOverDialog();
-            showInterstitialAd();
+            //showInterstitialAd();
           } else {
             if (snake.first == food) {
               growSnake();
@@ -668,10 +668,10 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     }
   }
 
-  void showInterstitialAd() {
-    EasyAds.instance
-        .showAd(AdUnitType.interstitial, adNetwork: AdNetwork.admob);
-  }
+  // void showInterstitialAd() {
+  //   EasyAds.instance
+  //       .showAd(AdUnitType.interstitial, adNetwork: AdNetwork.admob);
+  // }
 
   void showLevelUpEffect() {
     _levelUpAnimationController

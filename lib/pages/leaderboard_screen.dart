@@ -2,7 +2,7 @@ import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For system chrome
 import 'package:confetti/confetti.dart';
-import 'package:easy_ads_flutter/easy_ads_flutter.dart';
+
 import '../models/leaderboard_entry.dart';
 import '../services/leaderboard_service.dart';
 import 'package:games_services/games_services.dart' as games_services;

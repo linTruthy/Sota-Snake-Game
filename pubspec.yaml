@@ -19,7 +19,7 @@ dependencies:
   games_services: ^4.0.2
   confetti: ^0.7.0
   in_app_update: ^4.2.3
-  easy_ads_flutter: ^2.8.2
+  
 
 dev_dependencies:
   flutter_test:
