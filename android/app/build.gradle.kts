@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.truthysystems.sota"
-    compileSdk = 36
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

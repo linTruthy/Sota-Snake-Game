@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:sota_snake_game/app.dart';
 
 import 'firebase_options.dart';
-import 'services/ad_id_manager.dart';
 import 'services/play_games_service.dart';
 import 'services/score_manager.dart';
 import 'services/score_sync_manager.dart';

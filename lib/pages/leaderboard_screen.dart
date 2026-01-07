@@ -78,10 +78,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         maxResults: 20,
       );
       if (scores != null) {
-        if (mounted)
+        if (mounted) {
           setState(() => _globalLeaderboard
             ..clear()
             ..addAll(scores.map(_convertGameServicesScore)));
+        }
       }
       // Load weekly... (Logic assumed same as Phase 1 cleanup)
     } catch (_) {}
@@ -313,9 +314,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   Widget _buildPedestal(LeaderboardEntry entry, int rank, double height) {
     Color rankColor;
-    if (rank == 1)
+    if (rank == 1) {
       rankColor = _neonGold;
-    else if (rank == 2)
+    } else if (rank == 2)
       rankColor = Colors.grey;
     else
       rankColor = const Color(0xFFCD7F32); // Bronze
