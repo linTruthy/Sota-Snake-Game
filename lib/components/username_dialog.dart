@@ -1,7 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
-import 'dart:math' as math;
-
+import 'package:flutter/services.dart';
 import '../services/username_service.dart';
 
 class Username3DDialog extends StatefulWidget {
@@ -19,338 +18,391 @@ class Username3DDialog extends StatefulWidget {
 class _Username3DDialogState extends State<Username3DDialog>
     with SingleTickerProviderStateMixin {
   late TextEditingController _controller;
-  String? _errorText;
+
+  // Logic State
+  String? _statusMessage;
   bool _isChecking = false;
   bool _isValid = false;
-  late AnimationController _bounceController;
-  late Animation<double> _bounceAnimation;
-  final _formKey = GlobalKey<FormState>();
+  Color _statusColor = Colors.cyanAccent;
 
-  // Enhanced inappropriate words list
+  // Animation State
+  late AnimationController _appearController;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _opacityAnim;
+  Timer? _debounceTimer;
+
   final List<String> _inappropriateWords = [
     'profanity',
     'slur',
-    'offensive',
-    'inappropriate',
-    'vulgar',
-    'sex',
-    'pussy',
-    'fuck'
+    'admin',
+    'root',
+    'god',
+    'system',
+    'null'
   ];
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialUsername);
+    _statusMessage = "AWAITING INPUT...";
 
-    // Initialize bounce animation
-    _bounceController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+    // Holographic pop-in animation
+    _appearController = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 400),
     );
 
-    _bounceAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 1.05)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 30.0,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 1.05, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
-        weight: 70.0,
-      ),
-    ]).animate(_bounceController);
-
-    _bounceController.repeat(reverse: true);
-  }
-
-  bool _isValidUsername(String username) {
-    final RegExp validUsernameRegex = RegExp(r'^[a-zA-Z0-9_]{3,20}$');
-    final RegExp phoneNumberRegex = RegExp(r'\d{3,}');
-
-    // Check for basic username validity
-    if (!validUsernameRegex.hasMatch(username)) {
-      return false;
-    }
-
-    // Check for phone number pattern
-    if (phoneNumberRegex.hasMatch(username)) {
-      return false;
-    }
-
-    // Check for inappropriate content
-    username = username.toLowerCase();
-
-    // Direct word match
-    if (_inappropriateWords.contains(username)) {
-      return false;
-    }
-
-    // Substring match
-    for (String word in _inappropriateWords) {
-      if (username.contains(word)) {
-        return false;
-      }
-    }
-
-    // Leet speak check
-    String leetUsername = _convertToLeetSpeak(username);
-    for (String word in _inappropriateWords) {
-      if (leetUsername.contains(word)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  String _convertToLeetSpeak(String text) {
-    return text
-        .replaceAll('a', '4')
-        .replaceAll('e', '3')
-        .replaceAll('i', '1')
-        .replaceAll('o', '0')
-        .replaceAll('s', '5')
-        .replaceAll('t', '7');
-  }
-
-  Future<void> _checkUsername(String username) async {
-  if (username.isEmpty) {
-    setState(() {
-      _errorText = 'Username cannot be empty';
-      _isValid = false;
-    });
-    return;
-  }
-
-  if (!_isValidUsername(username)) {
-    setState(() {
-      _errorText = 'Invalid username. Use 3-20 letters, numbers, or underscores.';
-      _isValid = false;
-    });
-    return;
-  }
-
-  setState(() {
-    _isChecking = true;
-    _errorText = null;
-  });
-
-  // Check if username is taken using the username service
-  try {
-    bool isTaken = await UsernameService.isUsernameTaken(username);
-    
-    if (mounted) {
-      setState(() {
-        _isChecking = false;
-        if (isTaken) {
-          _errorText = 'This username is already taken';
-          _isValid = false;
-        } else {
-          _isValid = true;
-        }
-      });
-    }
-  } catch (e) {
-    if (mounted) {
-      setState(() {
-        _isChecking = false;
-        _errorText = 'Error checking username availability';
-        _isValid = false;
-      });
-    }
-  }
-}
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: AnimatedBuilder(
-        animation: _bounceAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _bounceAnimation.value,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.purple.shade900.withOpacity(0.9),
-                    Colors.deepPurple.shade800.withOpacity(0.9),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.purple.withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Title with 3D effect
-                  Transform(
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.001)
-                      ..rotateX(0.01 * math.pi),
-                    alignment: FractionalOffset.center,
-                    child: ShaderMask(
-                      shaderCallback: (bounds) => LinearGradient(
-                        colors: [
-                          Colors.purple.shade300,
-                          Colors.pink.shade300,
-                        ],
-                      ).createShader(bounds),
-                      child: const Text(
-                        'Create Your Username',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Username input field with animation
-                  Form(
-                    key: _formKey,
-                    child: TextFormField(
-                      controller: _controller,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: "Enter username",
-                        hintStyle:
-                            TextStyle(color: Colors.white.withOpacity(0.5)),
-                        errorText: _errorText,
-                        prefixIcon: const Icon(CupertinoIcons.person_alt_circle,
-                            color: Colors.white70),
-                        suffixIcon: _isChecking
-                            ? const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white70,
-                              )
-                            : _isValid
-                                ? const Icon(Icons.check_circle,
-                                    color: Colors.greenAccent)
-                                : _errorText != null
-                                    ? const Icon(Icons.error,
-                                        color: Colors.redAccent)
-                                    : null,
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
-                          borderSide: BorderSide(
-                            color: Colors.white.withOpacity(0.3),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
-                          borderSide: const BorderSide(
-                            color: Colors.purpleAccent,
-                            width: 2,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
-                          borderSide: const BorderSide(
-                            color: Colors.redAccent,
-                          ),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
-                          borderSide: const BorderSide(
-                            color: Colors.redAccent,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        _checkUsername(value);
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Action buttons with gradient
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text(
-                          'Cancel',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: _isValid && !_isChecking
-                            ? () {
-                                Navigator.of(context).pop(_controller.text);
-                              }
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ).copyWith(
-                          backgroundColor:
-                              WidgetStateProperty.resolveWith<Color>(
-                            (Set<WidgetState> states) {
-                              if (states.contains(WidgetState.disabled)) {
-                                return Colors.grey.withOpacity(0.3);
-                              }
-                              return Colors.purpleAccent;
-                            },
-                          ),
-                        ),
-                        child: _isChecking
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Save',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    _scaleAnim = CurvedAnimation(
+      parent: _appearController,
+      curve: Curves.easeOutBack,
     );
+
+    _opacityAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _appearController, curve: Curves.easeIn),
+    );
+
+    _appearController.forward();
+  }
+
+  void _onTextChanged(String value) {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+
+    setState(() {
+      _isChecking = true;
+      _statusMessage = "ANALYZING SYNTAX...";
+      _statusColor = Colors.amber;
+      _isValid = false;
+    });
+
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _validateAndCheck(value);
+    });
+  }
+
+  Future<void> _validateAndCheck(String username) async {
+    // 1. Local Validation (Instant)
+    if (username.isEmpty) {
+      _setStatus("INPUT REQUIRED", Colors.redAccent, valid: false);
+      return;
+    }
+
+    final validChars = RegExp(r'^[a-zA-Z0-9_]{3,15}$');
+    if (!validChars.hasMatch(username)) {
+      _setStatus("INVALID SYNTAX (3-15 CHARS, ALPHANUMERIC)", Colors.redAccent,
+          valid: false);
+      return;
+    }
+
+    // Basic profanity check
+    if (_inappropriateWords.any((w) => username.toLowerCase().contains(w))) {
+      _setStatus("DENIED: RESERVED WORD", Colors.redAccent, valid: false);
+      return;
+    }
+
+    // 2. Cloud Validation (Async)
+    setState(() => _statusMessage = "CONNECTING TO MAINFRAME...");
+
+    try {
+      bool isTaken = await UsernameService.isUsernameTaken(username);
+      if (isTaken) {
+        _setStatus("IDENTITY ALREADY CLAIMED", Colors.orangeAccent,
+            valid: false);
+      } else {
+        _setStatus("AVAILABLE // READY TO INITIALIZE", const Color(0xFF39FF14),
+            valid: true);
+      }
+    } catch (e) {
+      _setStatus("CONNECTION ERROR", Colors.redAccent, valid: false);
+    }
+  }
+
+  void _setStatus(String msg, Color color, {required bool valid}) {
+    if (!mounted) return;
+    setState(() {
+      _isChecking = false;
+      _statusMessage = msg;
+      _statusColor = color;
+      _isValid = valid;
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _bounceController.dispose();
+    _appearController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          // Dark Overlay with Blur
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () =>
+                  Navigator.of(context).pop(), // Click outside to close?
+              child: Container(color: Colors.black87),
+            ),
+          ),
+
+          Center(
+            child: AnimatedBuilder(
+              animation: _appearController,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _opacityAnim.value,
+                  child: Transform.scale(
+                    scale: _scaleAnim.value,
+                    child: child,
+                  ),
+                );
+              },
+              child: _buildHoloTerminal(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHoloTerminal() {
+    return CustomPaint(
+      painter: _SciFiCardPainter(borderColor: _statusColor),
+      child: Container(
+        width: 320,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(Icons.terminal, color: _statusColor, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  "IDENTITY PROTOCOL v2.0",
+                  style: TextStyle(
+                    color: _statusColor.withOpacity(0.8),
+                    fontFamily: 'Courier',
+                    fontSize: 12,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // The Label
+            const Text(
+              "ENTER CODENAME:",
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 10,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Custom Terminal Input
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                border:
+                    Border(bottom: BorderSide(color: _statusColor, width: 2)),
+              ),
+              child: Row(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Text(">",
+                        style: TextStyle(color: Colors.white54, fontSize: 18)),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontFamily: 'Courier',
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                      cursorColor: _statusColor,
+                      cursorWidth: 10, // Block cursor
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onChanged: _onTextChanged,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-Z0-9_]')),
+                        LengthLimitingTextInputFormatter(15),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Status Monitor (Typing Animation logic could go here, simply text for now)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _statusColor.withOpacity(0.1),
+                border: Border.all(color: _statusColor.withOpacity(0.3)),
+              ),
+              child: Text(
+                _isChecking ? "[ $_statusMessage ]" : "$_statusMessage",
+                style: TextStyle(
+                  color: _statusColor,
+                  fontSize: 10,
+                  fontFamily: 'Courier',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    "ABORT",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _buildTechButton(
+                  text: "INITIALIZE",
+                  isEnabled: _isValid && !_isChecking,
+                  onTap: () {
+                    HapticFeedback.heavyImpact();
+                    Navigator.of(context).pop(_controller.text);
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTechButton(
+      {required String text,
+      required bool isEnabled,
+      required VoidCallback onTap}) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: isEnabled ? 1.0 : 0.5,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isEnabled ? onTap : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              color: isEnabled ? _statusColor : Colors.grey[800],
+              // Cut corner on top-right and bottom-left
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(4),
+                bottomRight: Radius.circular(4),
+              ),
+              boxShadow: isEnabled
+                  ? [
+                      BoxShadow(
+                          color: _statusColor.withOpacity(0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2))
+                    ]
+                  : [],
+            ),
+            child: Text(
+              text,
+              style: TextStyle(
+                color: isEnabled ? Colors.black : Colors.white38,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Custom Painter for the Sci-Fi "Cut Corner" Card
+// ---------------------------------------------------------------------------
+class _SciFiCardPainter extends CustomPainter {
+  final Color borderColor;
+  _SciFiCardPainter({required this.borderColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    const cut = 20.0;
+
+    final paint = Paint()
+      ..color = const Color(0xFF0F0F1A)
+          .withOpacity(0.95) // Dark Navy/Black background
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = borderColor.withOpacity(0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    // The Sci-Fi Shape (Cut Top Left, Cut Bottom Right)
+    final path = Path()
+      ..moveTo(cut, 0)
+      ..lineTo(w, 0)
+      ..lineTo(w, h - cut)
+      ..lineTo(w - cut, h)
+      ..lineTo(0, h)
+      ..lineTo(0, cut)
+      ..close();
+
+    // Draw Fill
+    canvas.drawPath(path, paint);
+
+    // Draw Border
+    canvas.drawPath(path, borderPaint);
+
+    // Add glowing accent lines
+    final accentPaint = Paint()
+      ..color = borderColor
+      ..strokeWidth = 3;
+
+    // Corner Accents
+    canvas.drawLine(
+        const Offset(cut - 5, 0), const Offset(cut + 10, 0), accentPaint);
+    canvas.drawLine(
+        Offset(w - cut + 5, h), Offset(w - cut - 10, h), accentPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SciFiCardPainter oldDelegate) =>
+      oldDelegate.borderColor != borderColor;
 }

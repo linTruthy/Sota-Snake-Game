@@ -4,21 +4,20 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:confetti/confetti.dart';
 import 'package:easy_ads_flutter/easy_ads_flutter.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../components/game_controls.dart';
 import '../components/gameover_dialog.dart';
-import '../components/power_up_stack.dart';
 import '../components/game_score_display.dart';
+import '../logic/snake_game_logic.dart';
 import '../models/daily_task.dart';
 import '../models/power_up.dart';
 import '../services/daily_task.dart';
+import '../services/feedback_manager.dart';
 import '../services/play_games_service.dart';
 import '../services/score_manager.dart';
 import '../services/username_service.dart';
-import 'achievements_screen.dart';
-import 'daily_task_screen.dart';
 import 'leaderboard_screen.dart';
 import '../services/leaderboard_service.dart';
 import 'package:in_app_update/in_app_update.dart';
@@ -239,9 +238,35 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   var isMusicEnabled = true;
   double volume = 1;
 
+  late SnakeGameLogic _gameLogic;
+
   @override
   void initState() {
     super.initState();
+    FeedbackManager().initialize();
+    _gameLogic = SnakeGameLogic(
+        rows: 20,
+        columns: 20,
+        onEatFood: () {
+          _scoreManager.updateScore(_gameLogic.score);
+          FeedbackManager().eat(); // Sound + Medium Haptic
+        },
+        onGameOver: () {
+          FeedbackManager().gameOver(); // Heavy Haptic + Sound
+          showGameOverDialog();
+        },
+        onPowerUp: () {
+          FeedbackManager().powerUp();
+          // ... show visual effect logic
+        },
+        onTurn: () {
+          // Only haptic on manual input, logic handles this via queueDirection
+          // But if you want vibration EXACTLY when the button is pressed,
+          // handle it in the UI widget (GestureDetector/Dpad).
+          // If you want it when the snake actually TURNS, put it here.
+          // Recommendation: Handle it on BUTTON PRESS (UI layer) for instant feedback.
+        });
+
     loadInitialData();
     resetGame();
     _scoreManager.resetScore();
@@ -661,754 +686,95 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
 // Helper method to build menu items
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.grey[850]!.withOpacity(0.5),
-                  Colors.grey[900]!.withOpacity(0.5),
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Title and Username
+
+            ListenableBuilder(
+                listenable: _gameLogic,
+                builder: (context, _) {
+                  return GameScoreDisplay(
+                    scoreManager:
+                        _scoreManager, // Update ScoreManager to pull from logic or sync them
+                    level: 1, // You can add level logic to the class later
+                  );
+                }),
+            Expanded(
+              flex: 3, // Give board 3/5ths of space
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: SnakeGameBoard(gameLogic: _gameLogic),
+              ),
+            ),
+            Expanded(
+              flex: 2, // Give controls 2/5ths of space
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Only show D-Pad if user prefers it (or maybe screen is big enough)
+                  // You can wrap this in a Visibility widget controlled by Settings
+                  GameDpad(
+                    onDirectionChanged: (direction) {
+                      // Haptic is handled inside the Dpad button itself
+                      _gameLogic.queueDirection(direction);
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Play/Pause/Restart Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildGameButton(
+                          icon: Icons.refresh,
+                          onTap: () {
+                            FeedbackManager().buttonClick();
+                            _gameLogic.reset();
+                          }),
+                      _buildGameButton(
+                          icon: Icons.play_arrow_rounded,
+                          isBig: true,
+                          onTap: () {
+                            FeedbackManager().buttonClick();
+                            _gameLogic.startGame();
+                          }),
+                      _buildGameButton(
+                          icon: Icons.settings,
+                          onTap: () {
+                            FeedbackManager().buttonClick();
+                            _showSettingsDialog(context);
+                          }),
+                    ],
+                  )
                 ],
               ),
-              border: Border.all(
-                color: Colors.grey[800]!.withOpacity(0.5),
-                width: 1,
-              ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: Colors.green[400], size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right,
-                  color: Colors.grey[600],
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        drawer: Drawer(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.grey[900]!,
-                  Colors.grey[850]!,
-                  Colors.grey[900]!,
-                ],
-              ),
-            ),
-            child: Column(
-              children: [
-                // Profile Header
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.green[900]!,
-                        Colors.grey[900]!,
-                      ],
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Animated Pattern Overlay
-                      ...List.generate(
-                        5,
-                        (index) => AnimatedPositioned(
-                          duration: const Duration(seconds: 2),
-                          curve: Curves.easeInOut,
-                          child: Transform.rotate(
-                            angle: pi / 4,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.white.withOpacity(0.05),
-                                    Colors.white.withOpacity(0.1),
-                                  ],
-                                  stops: const [0.4, 0.6],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Profile Content
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.green[400]!,
-                                    Colors.green[600]!,
-                                  ],
-                                ),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.3),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 5),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(Icons.person,
-                                  size: 40, color: Colors.white),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              username ?? 'Guest',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.green[900]!.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'Player Profile',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Menu Items
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildMenuItem(
-                        icon: CupertinoIcons.doc_checkmark,
-                        title: 'Daily Tasks',
-                        subtitle: 'New',
-                        onTap: () {
-                          Navigator.pop(context); // Close drawer
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const DailyTasksScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildMenuItem(
-                        icon: CupertinoIcons.settings,
-                        title: 'Settings',
-                        subtitle: isSoundMuted ? 'Sound: Off' : 'Sound: On',
-                        onTap: () => _showSettingsDialog(context),
-                      ),
-                      _buildMenuItem(
-                        icon: Icons.leaderboard_rounded,
-                        title: 'Leaderboard',
-                        subtitle: 'View top players',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                LeaderboardScreen(username: username),
-                          ),
-                        ),
-                      ),
-                      _buildMenuItem(
-                        icon: CupertinoIcons.person,
-                        title: 'Profile',
-                        subtitle: username ?? 'Guest',
-                        onTap: _initializeUsername,
-                      ),
-                      _buildMenuItem(
-                        icon: CupertinoIcons.heart,
-                        title: 'Achievements',
-                        subtitle: 'View your progress',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) =>
-                                    const EnhancedAchievementsScreen()),
-                          );
-                        },
-                      ),
-                      _buildMenuItem(
-                        icon: CupertinoIcons.info_circle,
-                        title: 'How to Play',
-                        subtitle: 'View your progress',
-                        onTap: () => _showHowToPlayDialog(context),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Footer
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.grey[800]!,
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.games, size: 16, color: Colors.grey[400]),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Sota Snake v1.1.1',
-                            style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'Truthy Systems',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(48), // Reduced height
-          child: AppBar(
-            automaticallyImplyLeading: false, // Disable default drawer button
-            flexibleSpace: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.black,
-                    Colors.black87,
-                    Colors.green.shade900,
-                  ],
-                ),
-              ),
-              child: SafeArea(
-                child: Row(
-                  children: [
-                    // Menu Button wrapped in Builder
-                    Builder(
-                      builder: (BuildContext context) => IconButton(
-                        icon: Icon(Icons.menu, color: Colors.green.shade400),
-                        onPressed: () => Scaffold.of(context).openDrawer(),
-                      ),
-                    ),
-
-                    // Title and Username
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Sota Snake',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            foreground: Paint()
-                              ..shader = LinearGradient(
-                                colors: [
-                                  Colors.green.shade400,
-                                  Colors.green.shade200,
-                                ],
-                              ).createShader(
-                                  const Rect.fromLTWH(0, 0, 200, 70)),
-                          ),
-                        ),
-                        Text(
-                          'Welcome, ${username ?? 'Guest'}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green.shade400.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const Spacer(),
-
-                    // Sound Toggle Button
-                    IconButton(
-                      icon: Icon(
-                        isSoundMuted
-                            ? CupertinoIcons.volume_off
-                            : CupertinoIcons.volume_up,
-                        color: isSoundMuted
-                            ? Colors.red.shade400
-                            : Colors.green.shade400,
-                      ),
-                      onPressed: toggleSound,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            elevation: 0, // Remove default shadow
-          ),
-        ),
-        floatingActionButtonLocation:
-            FloatingActionButtonLocation.miniCenterDocked,
-        floatingActionButton: FloatingActionButton(
-          elevation: 10,
-          onPressed: togglePause,
-          backgroundColor: isPaused ? Colors.red : Colors.green,
-          shape: const CircleBorder(),
-          child: Icon(
-            isPaused ? CupertinoIcons.play_arrow_solid : CupertinoIcons.pause,
-            color: Colors.white,
-          ),
-        ),
-        body: Stack(children: [
-          Column(
-            children: [
-              if (_activePowerUps.isEmpty)
-                const EasySmartBannerAd(
-                  priorityAdNetworks: [
-                    AdNetwork.admob,
-                    AdNetwork.unity,
-                    AdNetwork.facebook,
-                  ],
-                  adSize: AdSize.banner,
-                ),
-              if (_activePowerUps.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: PowerUpStack(
-                    powerUps: _activePowerUps,
-                    remainingTimes: _remainingTimes,
-                    durations: _powerUpDurations,
-                  ),
-                ),
-              const SizedBox(height: 3),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: GameScoreDisplay(
-                  scoreManager: _scoreManager,
-                  level: level,
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(3.0),
-                  child: SnakeGameBoard(
-                    rows: rows,
-                    columns: columns,
-                    snake: snake,
-                    food: food,
-                    powerUps: powerUps,
-                    snakeSpeed: snakeSpeed,
-                    onDirectionChange: (Direction newDirection) {
-                      if (!isPaused && !isGameOver) {
-                        setState(() {
-                          changeDirection(newDirection);
-                        });
-                      }
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(
-                height: 3,
-              ),
-              if (!isGameOver || isPaused) ...[
-                if (_activePowerUps.isEmpty)
-                  const EasySmartBannerAd(
-                    priorityAdNetworks: [
-                      AdNetwork.admob,
-                      AdNetwork.unity,
-                      AdNetwork.facebook,
-                    ],
-                    adSize: AdSize.banner,
-                  )
-              ],
-              if (isGameOver)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Game Over!',
-                        style: TextStyle(fontSize: 24, color: Colors.red),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              backgroundColor: Colors.deepOrange, // Text color
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18.0),
-                              ),
-                              elevation: 8,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                resetGame();
-                              });
-                            },
-                            child: const Text('Play Again'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          if (isPowerUp)
-            Positioned(
-              top: 10,
-              left: 100,
-              child: AnimatedBuilder(
-                animation: _powerUpAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _powerUpAnimation.value,
-                    child: const Icon(
-                      Icons.flash_on,
-                      color: Colors.yellow,
-                      size: 24,
-                    ),
-                  );
-                },
-              ),
-            ),
-          if (_showTaskCompletionBanner)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 20,
-              left: 20,
-              right: 20,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 300),
-                opacity: _showTaskCompletionBanner ? 1.0 : 0.0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green[700]!,
-                        Colors.green[600]!,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Task Completed!',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text(
-                              _completedTaskTitle,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // Confetti overlay for task completion
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _taskConfettiController,
-              blastDirection: pi / 2,
-              maxBlastForce: 5,
-              minBlastForce: 2,
-              emissionFrequency: 0.05,
-              numberOfParticles: 20,
-              gravity: 0.1,
-              colors: const [
-                Colors.green,
-                Colors.blue,
-                Colors.pink,
-                Colors.orange,
-                Colors.purple
-              ],
-            ),
-          ),
-        ]),
-        bottomNavigationBar: Container(
-          height: 68,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.grey[900]!,
-                Colors.grey[850]!,
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 10,
-                offset: const Offset(0, -3),
-              ),
-              BoxShadow(
-                color: Colors.green.withOpacity(0.1),
-                blurRadius: 15,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              // Top Glow Line
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: 1,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.transparent,
-                        Colors.green.withOpacity(0.3),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Main Content
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // Leaderboard Button
-                  _buildGlowingButton(
-                    icon: CupertinoIcons.graph_circle_fill,
-                    color: Colors.amber,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            LeaderboardScreen(username: username),
-                      ),
-                    ),
-                    glowColor: Colors.amber.withOpacity(0.3),
-                  ),
-
-                  // Center Play/Pause Button
-                  Transform.translate(
-                    offset: const Offset(0, -25),
-                    child: _buildGlowingButton(
-                      icon: isPaused
-                          ? CupertinoIcons.play_arrow
-                          : CupertinoIcons.pause,
-                      color: Colors.green,
-                      onTap: togglePause,
-                      isLarge: true,
-                      glowColor: Colors.green.withOpacity(0.3),
-                    ),
-                  ),
-
-                  // Reset Button
-                  _buildGlowingButton(
-                    icon: CupertinoIcons.refresh,
-                    color: Colors.blue,
-                    onTap: () {
-                      setState(() {
-                        resetGame();
-                      });
-                    },
-                    glowColor: Colors.blue.withOpacity(0.3),
-                  ),
-                ],
-              ),
-
-              // Bottom Glow Line
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: 1,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.transparent,
-                        Colors.green.withOpacity(0.2),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ));
-  }
-
-  Widget _buildGlowingButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    bool isLarge = false,
-    required Color glowColor,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(isLarge ? 30 : 15),
-        boxShadow: [
-          BoxShadow(
-            color: glowColor,
-            blurRadius: 15,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(isLarge ? 30 : 15),
-          child: Container(
-            padding: EdgeInsets.all(isLarge ? 20 : 12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  color.withOpacity(0.8),
-                  color.withOpacity(0.6),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(isLarge ? 38 : 15),
-              border: Border.all(
-                color: color.withOpacity(0.3),
-                width: isLarge ? 2 : 1,
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: isLarge ? 28 : 20,
-              color: Colors.white,
-            ),
-          ),
-        ),
+  Widget _buildGameButton(
+      {required IconData icon,
+      required VoidCallback onTap,
+      bool isBig = false}) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        padding: EdgeInsets.all(isBig ? 20 : 12),
+        decoration: BoxDecoration(
+            color: Colors.green.withOpacity(0.2),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.greenAccent, width: 2)),
+        child: Icon(icon, color: Colors.greenAccent, size: isBig ? 40 : 24),
       ),
     );
   }
@@ -1427,131 +793,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       timer.cancel();
     }
     _powerUpTimers.clear();
+    _gameLogic.dispose();
     super.dispose();
-  }
-
-  void _showHowToPlayDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.grey[900],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'How to Play',
-            style: TextStyle(color: Colors.green),
-            textAlign: TextAlign.center,
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildInstructionCard(
-                  icon: Icons.swipe,
-                  title: 'Controls',
-                  description: 'Swipe in any direction to move the snake.',
-                ),
-                const SizedBox(height: 16),
-                _buildInstructionCard(
-                  icon: Icons.restaurant,
-                  title: 'Eat Food',
-                  description:
-                      'Collect red food dots to grow longer and score points.',
-                ),
-                const SizedBox(height: 16),
-                _buildInstructionCard(
-                  icon: Icons.flash_on,
-                  title: 'Power-ups',
-                  description: 'Collect blue power-ups for special abilities.',
-                ),
-                const SizedBox(height: 16),
-                _buildInstructionCard(
-                  icon: Icons.warning,
-                  title: 'Avoid Collisions',
-                  description:
-                      'Don\'t hit the snake\'s body or it\'s game over!',
-                ),
-                const SizedBox(height: 16),
-                _buildInstructionCard(
-                  icon: Icons.task_alt,
-                  title: 'Daily Tasks',
-                  description:
-                      'Complete daily challenges to earn bonus points.',
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Got it!',
-                style: TextStyle(color: Colors.green),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildInstructionCard({
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[850],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.green.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: Colors.green,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  description,
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   void showGameOverDialog() {

@@ -59,21 +59,23 @@ class PlayGamesService {
 
   // Submit score to leaderboard
   Future<void> submitScore(int score) async {
-    if (!_isSignedIn) return;
+    if (!_isSignedIn) {
+      // Attempt silent sign-in if connection was lost
+      await signIn();
+      if (!_isSignedIn) return;
+    }
 
     try {
       final scoreData = games_services.Score(
-        androidLeaderboardID:
-            'CgkIv-Wvj_EHEAIQAg', // Your Android leaderboard ID
-        iOSLeaderboardID: 'sota_snake_leaderboard', // Your iOS leaderboard ID
+        androidLeaderboardID: 'CgkIv-Wvj_EHEAIQAg',
+        iOSLeaderboardID: 'sota_snake_leaderboard',
         value: score,
       );
-
       await games_services.Leaderboards.submitScore(score: scoreData);
     } catch (e) {
-      if (kDebugMode) {
-        print('Error submitting score: $e');
-      }
+      // Catch specific Game Services exceptions here
+      // Do NOT rethrow, as this will crash the Game Logic calling it
+      if (kDebugMode) print('Game Services Error: $e');
     }
   }
 
@@ -180,4 +182,3 @@ class PlayGamesService {
     }
   }
 }
-
