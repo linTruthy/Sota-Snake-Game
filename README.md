@@ -112,5 +112,5 @@ If you like this project, please give it a ⭐️ on GitHub!
 - Email: truthysys@gmail.com
 
 ---
-git remote set-url origin https://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@github.com/linTruthy/Sota-Snake-Game.git
+
 Built with ❤️ by Truthy Systems
