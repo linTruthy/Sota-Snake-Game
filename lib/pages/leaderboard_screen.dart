@@ -1,6 +1,6 @@
 import 'dart:math' show pi;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For system chrome
+// For system chrome
 import 'package:confetti/confetti.dart';
 
 import '../models/leaderboard_entry.dart';

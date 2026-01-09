@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '669133426887',
     projectId: 'sota-snake-game',
     authDomain: 'sota-snake-game.firebaseapp.com',
-    storageBucket: 'sota-snake-game.appspot.com',
+    storageBucket: 'sota-snake-game.firebasestorage.app',
     measurementId: 'G-TDRZJ6N3ZE',
   );
 
@@ -61,7 +61,7 @@ class DefaultFirebaseOptions {
     appId: '1:669133426887:android:f4394fc0587b27e8c62ee2',
     messagingSenderId: '669133426887',
     projectId: 'sota-snake-game',
-    storageBucket: 'sota-snake-game.appspot.com',
+    storageBucket: 'sota-snake-game.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -69,7 +69,8 @@ class DefaultFirebaseOptions {
     appId: '1:669133426887:ios:83f093fe9a13dd40c62ee2',
     messagingSenderId: '669133426887',
     projectId: 'sota-snake-game',
-    storageBucket: 'sota-snake-game.appspot.com',
+    storageBucket: 'sota-snake-game.firebasestorage.app',
     iosBundleId: 'com.truthysystems.sota',
   );
+
 }

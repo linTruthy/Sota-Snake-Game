@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "669133426887",
     "project_id": "sota-snake-game",
-    "storage_bucket": "sota-snake-game.appspot.com"
+    "storage_bucket": "sota-snake-game.firebasestorage.app"
   },
   "client": [
     {
@@ -22,7 +22,8 @@
         "appinvite_service": {
           "other_platform_oauth_client": []
         }
-      }
+      },
+      "admob_app_id": "ca-app-pub-8267064683737776~8869524204"
     }
   ],
   "configuration_version": "1"
